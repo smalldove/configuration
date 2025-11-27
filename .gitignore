@@ -1,55 +1,86 @@
-# Prerequisites
-*.d
+# Ignore all files and directories by default
+*
 
-# Object files
+# But explicitly track the directories and files we want
+!src/
+!project/
+!CMakeLists.txt
+!build_project.sh
+
+# Allow tracking of files within the tracked directories
+!src/**
+!project/**
+
+# Explicitly ignore build artifacts and other generated files
+build_about/
 *.o
-*.ko
-*.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
 *.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
 *.so
-*.so.*
 *.dylib
-
-# Executables
+*.dll
 *.exe
 *.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.db
+*.opendb
 
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
+# Ignore any backup files
+*.bak
+*.backup
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+# Ignore any temporary files
+*.tmp
+*.temp
 
-# debug information files
-*.dwo
+# Ignore any IDE specific files
+.project
+.classpath
+.settings/
+.cproject
+.nbproject
+
+# Ignore any OS generated files
+ehthumbs.db
+Icon?
+._*
+
+# Ignore any compiled Python files
+*.pyc
+*.pyo
+__pycache__/
+
+# Ignore any node_modules
+node_modules/
+
+# Ignore any package-lock files
+package-lock.json
+yarn.lock
+
+# Ignore any environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Ignore any coverage directories
+coverage/
+.nyc_output/
+
+# Ignore any debug logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
