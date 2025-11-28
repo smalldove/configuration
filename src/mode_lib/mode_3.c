@@ -21,4 +21,4 @@ static void *func_3_out(struct my_node *self, int arg_n)
 // 优雅的函数注册
 REGISTER_FUNC_START(mode_3)
     REGISTER_FUNC("func_3", func_3_in, func_3, func_3_out)
-REGISTER_FUNC_END()
+REGISTER_FUNC_END(mode_3)

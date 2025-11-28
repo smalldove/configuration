@@ -1,0 +1,39 @@
+property:
+  - name: comb_1
+    type: module
+    version: 1.0
+  - input:
+    - [relay1. 1]
+    - [relay2. 1]
+    - [relay3, 2]
+
+
+blocks:
+  - id: start1
+    type: start
+    list: 
+      - relay1
+
+  - id: relay1                 
+    func: func_1
+    type: relay
+    list: 
+      - relay2
+    outputs: 
+      - 
+        - [relay2, 1]
+        - [relay3, 2]
+      - 
+        - [relay2, 1]
+        - [relay1, 1]
+
+
+  - id: relay2
+    func: func_2
+    type: relay    
+    list: 
+      - relay3
+    outputs: [relay3]
+
+  - id: relay3
+    type: end

@@ -67,6 +67,6 @@ struct my_node {
     struct func_attribute self;
 };
 
-extern struct func_attribute func_list[30];
+extern struct func_attribute *func_list[100];
 
 #endif
