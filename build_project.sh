@@ -13,7 +13,7 @@ rm -rf build_about
 
 # Configure the project with CMake (this will automatically create build_about directory)
 echo "Configuring project with CMake..."
-cmake -B build_about -S .
+cmake -B build_about -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=1
 
 # Build the project
 echo "Building the project..."
