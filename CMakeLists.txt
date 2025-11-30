@@ -215,6 +215,16 @@ else()
     message(STATUS "Math library not found - continuing without it")
 endif()
 
+# YAML library (required for YAML parsing)
+find_library(YAML_LIBRARY yaml)
+if(YAML_LIBRARY)
+    target_link_libraries(VoltageMonitor PRIVATE ${YAML_LIBRARY})
+    target_compile_definitions(VoltageMonitor PRIVATE HAVE_YAML=1)
+    message(STATUS "Found YAML library: YES")
+else()
+    message(FATAL_ERROR "YAML library not found - required for YAML parsing")
+endif()
+
 # =============================================================================
 # Project Information
 # =============================================================================
