@@ -4,11 +4,8 @@
 #include <string.h>
 #include <search.h>  // 包含tsearch/tfind等平衡树函数
 
-// 平衡树字典结构 - 零碰撞确定性结构
-typedef struct tree_node {
-    char *key;                    // 函数ID字符串
-    struct func_attribute *func;  // 函数属性指针
-} tree_node_t;
+
+
 
 // 全局平衡树根节点
 static void *tree_root = NULL;
@@ -23,9 +20,9 @@ static int string_compare(const void *a, const void *b)
 }
 
 // 模块注册函数
-void register_module_functions(struct func_attribute *funcs)
+void register_module_functions(struct func_attribute (*(*funcs)(void)), char *func_id)
 {
-    if (funcs == NULL || funcs->id_func[0] == '\0') {
+    if (funcs == NULL || func_id[0] == '\0') {
         return;
     }
     
@@ -36,7 +33,7 @@ void register_module_functions(struct func_attribute *funcs)
     }
     
     // 复制函数ID字符串
-    new_node->key = strdup(funcs->id_func);
+    new_node->key = strdup(func_id);
     if (new_node->key == NULL) {
         free(new_node);
         return;
@@ -67,7 +64,7 @@ void register_module_functions(struct func_attribute *funcs)
 }
 
 // 根据函数ID查找函数
-struct func_attribute *find_function_by_id(const char *func_id)
+REG_MODE_FUNC_T find_function_by_id(const char *func_id)
 {
     if (func_id == NULL || func_id[0] == '\0') {
         return NULL;
@@ -86,13 +83,6 @@ struct func_attribute *find_function_by_id(const char *func_id)
     return NULL;
 }
 
-// 初始化函数注册表
-void init_func_registry(void)
-{
-    // 哈希表已经初始化为NULL，无需额外操作
-    // 这个函数保留用于向后兼容性
-}
-
 // 获取注册的函数数量
 int get_registered_func_count(void)
 {
@@ -100,7 +90,7 @@ int get_registered_func_count(void)
 }
 
 // 遍历所有注册的函数（用于调试和显示）
-static void (*current_callback)(struct func_attribute *func, void *arg) = NULL;
+static void (*current_callback)(REG_MODE_FUNC_T func, void *arg) = NULL;
 static void *current_callback_arg = NULL;
 
 static void walk_action(const void *node, VISIT order, int level) {
@@ -110,7 +100,7 @@ static void walk_action(const void *node, VISIT order, int level) {
     }
 }
 
-void iterate_all_functions(void (*callback)(struct func_attribute *func, void *arg), void *arg)
+void iterate_all_functions(void (*callback)(REG_MODE_FUNC_T func, void *arg), void *arg)
 {
     if (callback == NULL) {
         return;

@@ -7,7 +7,12 @@ property:
     - [relay2. 1]
     - [relay3, 2]
 
+  - output:
+    - [relay1. 1]
+    - [relay1. 2]
+    - [relay2, 1]
 
+ 
 blocks:
   - id: start1
     type: start
@@ -19,7 +24,7 @@ blocks:
     type: relay
     list: 
       - relay2
-    outputs: 
+    outputs:  
       - 
         - [relay2, 1]
         - [relay3, 2]

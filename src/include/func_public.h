@@ -29,21 +29,19 @@ struct func_attribute
 {
     int input_num;      // 支持输入的个数
     int output_num;     // 支持输出的个数
-    char id_func[128];  // id追溯唯一判定 例如哈希值
-
     void *arg;      
-    
     /*
     self : 自身块指针
     arg : 入参
     arg_n : 指定输入号(从0开始)
     */
-    int (*in_attribute)(struct my_node *self, void *arg, int *arg_n);
+    int (*in_attribute)(struct my_node *self, void *arg, int arg_n);
+    
     /*
     函数执行
     */
     
-    int (*func)(struct my_node *self, void *arg, int arg_n);
+    int (*func)(struct my_node *self);
     /*
     输出参数回调
     self : 自身块指针
@@ -55,18 +53,18 @@ struct func_attribute
 
 struct my_node {
 
-    char id_name[64];               // 实例名称
+    char id_name[64];                   // 实例名称
     
     enum Node_type type;
-    struct list_head list[32];      // 内嵌链表节点
-    int num;
 
-    struct list_head out_list[32];  // 输出指向
-    int out_num;
+    struct list_head next[32];          // 链路的指向调用表
+    /*默认限制是最大32个并发链路，可拓展，默认初始化时next与next_table保持一致*/
+    struct list_head next_table[32];    // 链路的指向实例总表
+    
+    struct list_head out_list;          // 输出指向的调用表
+    struct list_head out_list_table;    // 输出指向的实例总表
     
     struct func_attribute self;
 };
-
-extern struct func_attribute *func_list[100];
 
 #endif

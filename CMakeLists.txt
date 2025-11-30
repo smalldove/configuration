@@ -85,6 +85,7 @@ set(SOURCE_DIRECTORIES
     src/main      # Main application entry point
     src/app       # Application logic and function registry
     src/mode_lib  # Mode-specific function implementations
+    src/lib       # Library modules (balanced tree, etc.)
 )
 
 # Define include directories

@@ -3,21 +3,27 @@
 #include <stdio.h>
 
 // 用于显示函数的回调函数
-static void print_func_info(struct func_attribute *func, void *arg)
+static void print_func_info(REG_MODE_FUNC_T func, void *arg)
 {
     static int count = 0;
-    printf("函数 %d: ID=%s, 输入数=%d, 输出数=%d\n", 
+    struct func_attribute *self = func();
+    printf("函数 %d: 输入数=%d, 输出数=%d\n", 
            ++count, 
-           func->id_func,
-           func->input_num,
-           func->output_num);
+           self->input_num,
+           self->output_num);
+    
+    // 释放分配的内存
+    if (self != NULL) {
+        if (self->arg != NULL) {
+            free(self->arg);
+        }
+        free(self);
+    }
 }
 
 // 演示平衡树函数注册系统的使用
 void demo_balanced_tree_registry(void)
 {
-    // 初始化函数注册表
-    init_func_registry();
     
     printf("=== 平衡树函数注册系统演示 ===\n");
     printf("使用glibc tsearch/tfind实现零碰撞确定性结构\n\n");
@@ -32,17 +38,17 @@ void demo_balanced_tree_registry(void)
     printf("\n=== 平衡树查找演示 ===\n");
     
     // 查找存在的函数
-    struct func_attribute *found_func = find_function_by_id("func_1");
+    REG_MODE_FUNC_T found_func = find_function_by_id("mode_1");
     if (found_func != NULL) {
-        printf("✅ 成功找到函数: ID=%s\n", found_func->id_func);
+        printf("✅ 成功找到函数: ID=%s\n", "mode_1");
     } else {
-        printf("❌ 未找到函数 func_1\n");
+        printf("❌ 未找到函数 mode_1\n");
     }
     
     // 查找不存在的函数
     found_func = find_function_by_id("non_existent_func");
     if (found_func != NULL) {
-        printf("❌ 找到函数: ID=%s (不应该发生)\n", found_func->id_func);
+        printf("❌ 找到函数: ID=%s (不应该发生)\n", "non_existent_func");
     } else {
         printf("✅ 未找到函数 non_existent_func (预期结果)\n");
     }
