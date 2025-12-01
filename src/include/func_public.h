@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "list.h"
-
 enum Node_type
 {
     NODE_START = 0,

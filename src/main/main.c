@@ -1,6 +1,7 @@
 #include "func_public.h"
 #include "func_registry.h"
 #include <stdio.h>
+#include "list_cfg_loading.h"
 
 // 用于显示函数的回调函数
 static void print_func_info(REG_MODE_FUNC_T func, void *arg)
@@ -62,6 +63,7 @@ void demo_balanced_tree_registry(void)
 
 int main()
 {
+    parse_flow_yaml_example();
     demo_balanced_tree_registry();
     
     // 程序退出前清理平衡树

@@ -3,8 +3,12 @@
 #include "list_cfg_loading.h"
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h> // 用于strcasecmp
 #include <search.h>  // 包含tsearch/tfind等平衡树函数
 #include <yaml.h>    // yaml解析库
+#include <ctype.h>   // 用于字符处理
+#include <stdio.h>   // 用于文件操作
+#include <cjson/cJSON.h> // cJSON库用于JSON解析
 
 // 配置节点平衡树结构
 typedef struct cfg_tree_node {
@@ -155,146 +159,48 @@ int get_cfg_tree_height_info(int *max_height)
 }
 
 // =============================================================================
-// YAML 解析函数
+// 配置文件解析函数 (支持YAML和JSON)
 // =============================================================================
 
-// 解析 flow.yaml 文件的回调函数类型
-typedef void (*yaml_block_callback_t)(const char *id, const char *type, const char *func, 
-                                     void **list_array, int list_count,
-                                     void **outputs_array, int outputs_count,
-                                     void *user_data);
+// 解析配置文件的回调函数类型
+typedef void (*config_block_callback_t)(const char *id, const char *type, const char *func, 
+                                       void **list_array, int list_count,
+                                       void **outputs_array, int outputs_count,
+                                       void *user_data);
+
+// 函数声明
+static const char *get_file_extension(const char *filename);
+static int parse_yaml_file(const char *filename, config_block_callback_t callback, void *user_data);
+static int parse_json_file(const char *filename, config_block_callback_t callback, void *user_data);
+
+// 获取文件扩展名
+static const char *get_file_extension(const char *filename)
+{
+    const char *dot = strrchr(filename, '.');
+    if (!dot || dot == filename) {
+        return "";
+    }
+    return dot + 1;
+}
 
 // 解析 flow.yaml 文件的主函数
-int parse_flow_yaml(const char *filename, yaml_block_callback_t callback, void *user_data)
+int parse_flow_yaml(const char *filename, config_block_callback_t callback, void *user_data)
 {
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        fprintf(stderr, "Failed to open file: %s\n", filename);
-        return -1;
-    }
-
-    yaml_parser_t parser;
-    yaml_event_t event;
-    int ret = 0;
-
-    // 初始化解析器
-    if (!yaml_parser_initialize(&parser)) {
-        fprintf(stderr, "Failed to initialize YAML parser\n");
-        fclose(file);
-        return -1;
-    }
-
-    yaml_parser_set_input_file(&parser, file);
-
-    // 解析状态变量
-    int in_blocks = 0;
-    int in_block = 0;
-    int in_key = 0;
-    char current_key[64] = {0};
-    char current_id[64] = {0};
-    char current_type[64] = {0};
-    char current_func[64] = {0};
+    // 检查文件扩展名
+    const char *ext = get_file_extension(filename);
     
-    void **current_list = NULL;
-    int list_count = 0;
-    void **current_outputs = NULL;
-    int outputs_count = 0;
-
-    // 开始解析
-    do {
-        if (!yaml_parser_parse(&parser, &event)) {
-            fprintf(stderr, "YAML parser error\n");
-            ret = -1;
-            break;
+    if (strcasecmp(ext, "yaml") == 0 || strcasecmp(ext, "yml") == 0) {
+        return parse_yaml_file(filename, callback, user_data);
+    } else if (strcasecmp(ext, "json") == 0) {
+        return parse_json_file(filename, callback, user_data);
+    } else {
+        // 默认尝试YAML，如果失败则尝试JSON
+        int result = parse_yaml_file(filename, callback, user_data);
+        if (result != 0) {
+            result = parse_json_file(filename, callback, user_data);
         }
-
-        switch (event.type) {
-            case YAML_STREAM_START_EVENT:
-                break;
-
-            case YAML_DOCUMENT_START_EVENT:
-                break;
-
-            case YAML_MAPPING_START_EVENT:
-                if (in_blocks && in_block) {
-                    // 进入 block 内部的映射
-                } else if (in_blocks) {
-                    // 进入 block 项
-                    in_block = 1;
-                    memset(current_id, 0, sizeof(current_id));
-                    memset(current_type, 0, sizeof(current_type));
-                    memset(current_func, 0, sizeof(current_func));
-                    list_count = 0;
-                    outputs_count = 0;
-                } else {
-                    // 检查是否进入 blocks 映射
-                    in_blocks = 1;
-                }
-                break;
-
-            case YAML_MAPPING_END_EVENT:
-                if (in_block) {
-                    
-                    in_block = 0;
-                } else if (in_blocks) {
-                    in_blocks = 0;
-                }
-                break;
-
-            case YAML_SEQUENCE_START_EVENT:
-                if (in_block && strcmp(current_key, "list") == 0) {
-                    // 开始解析 list 数组
-                } else if (in_block && strcmp(current_key, "outputs") == 0) {
-                    // 开始解析 outputs 数组
-                }
-                break;
-
-            case YAML_SEQUENCE_END_EVENT:
-                break;
-
-            case YAML_SCALAR_EVENT:
-                if (in_block) {
-                    if (!in_key) {
-                        // 这是键
-                        strncpy(current_key, (char*)event.data.scalar.value, 
-                               sizeof(current_key) - 1);
-                        in_key = 1;
-                    } else {
-                        // 这是值
-                        if (strcmp(current_key, "id") == 0) {
-                            strncpy(current_id, (char*)event.data.scalar.value, 
-                                   sizeof(current_id) - 1);
-                        } else if (strcmp(current_key, "type") == 0) {
-                            strncpy(current_type, (char*)event.data.scalar.value, 
-                                   sizeof(current_type) - 1);
-                        } else if (strcmp(current_key, "func") == 0) {
-                            strncpy(current_func, (char*)event.data.scalar.value, 
-                                   sizeof(current_func) - 1);
-                        }
-                        in_key = 0;
-                    }
-                } else if (in_blocks && strcmp((char*)event.data.scalar.value, "blocks") == 0) {
-                    // 找到 blocks 键
-                }
-                break;
-
-            default:
-                break;
-        }
-
-        yaml_event_delete(&event);
-
-    } while (event.type != YAML_STREAM_END_EVENT);
-    if (callback && current_id[0] != '\0') {
-        callback(current_id, current_type, current_func, 
-                current_list, list_count,
-                current_outputs, outputs_count,
-                user_data);
+        return result;
     }
-    // 清理
-    yaml_parser_delete(&parser);
-    fclose(file);
-    return ret;
 }
 
 // 示例回调函数 - 用于演示如何访问解析的数据
@@ -329,8 +235,8 @@ void parse_flow_yaml_example(void)
     printf("=== 开始解析 flow.yaml ===\n");
     
     // 预设调用变量
-    const char *filename = "src/flow.yaml";
-    yaml_block_callback_t callback = example_block_callback;
+    const char *filename = "/home/xcvbnm/configuration/src/flow.json";
+    config_block_callback_t callback = example_block_callback;
     void *user_data = NULL;  // 可以传递任意用户数据
     
     // 调用解析函数
@@ -341,4 +247,189 @@ void parse_flow_yaml_example(void)
     } else {
         printf("=== 解析失败 ===\n");
     }
+}
+
+// =============================================================================
+// JSON 解析函数实现 (使用cJSON库)
+// =============================================================================
+
+// 使用cJSON库解析JSON文件的函数
+static int parse_json_file(const char *filename, config_block_callback_t callback, void *user_data)
+{
+    if (filename == NULL || callback == NULL) {
+        return -1;
+    }
+    
+    // 读取JSON文件内容
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        fprintf(stderr, "Error: Cannot open JSON file '%s'\n", filename);
+        return -1;
+    }
+    
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    
+    if (file_size <= 0) {
+        fclose(file);
+        fprintf(stderr, "Error: JSON file '%s' is empty\n", filename);
+        return -1;
+    }
+    
+    char *json_content = malloc(file_size + 1);
+    if (json_content == NULL) {
+        fclose(file);
+        fprintf(stderr, "Error: Memory allocation failed for JSON file\n");
+        return -1;
+    }
+    
+    size_t bytes_read = fread(json_content, 1, file_size, file);
+    json_content[bytes_read] = '\0';
+    fclose(file);
+    
+    // 使用cJSON解析JSON
+    cJSON *root = cJSON_Parse(json_content);
+    free(json_content);
+    
+    if (root == NULL) {
+        const char *error_ptr = cJSON_GetErrorPtr();
+        if (error_ptr != NULL) {
+            fprintf(stderr, "Error parsing JSON: %s\n", error_ptr);
+        }
+        return -1;
+    }
+    
+    // 查找blocks数组
+    cJSON *blocks = cJSON_GetObjectItemCaseSensitive(root, "blocks");
+    if (!cJSON_IsArray(blocks)) {
+        fprintf(stderr, "Error: 'blocks' is not an array or not found\n");
+        cJSON_Delete(root);
+        return -1;
+    }
+    
+    int block_count = 0;
+    cJSON *block_item = NULL;
+    
+    // 遍历所有blocks
+    cJSON_ArrayForEach(block_item, blocks) {
+        if (!cJSON_IsObject(block_item)) {
+            fprintf(stderr, "Warning: Block item is not an object, skipping\n");
+            continue;
+        }
+        
+        // 解析block中的字段
+        cJSON *id_item = cJSON_GetObjectItemCaseSensitive(block_item, "id");
+        cJSON *type_item = cJSON_GetObjectItemCaseSensitive(block_item, "type");
+        cJSON *func_item = cJSON_GetObjectItemCaseSensitive(block_item, "func");
+        cJSON *list_item = cJSON_GetObjectItemCaseSensitive(block_item, "list");
+        cJSON *outputs_item = cJSON_GetObjectItemCaseSensitive(block_item, "outputs");
+        
+        // 检查必需字段
+        if (id_item == NULL || type_item == NULL || 
+            !cJSON_IsString(id_item) || !cJSON_IsString(type_item)) {
+            fprintf(stderr, "Warning: Block missing required 'id' or 'type' field, skipping\n");
+            continue;
+        }
+        
+        const char *id = id_item->valuestring;
+        const char *type = type_item->valuestring;
+        const char *func = (func_item != NULL && cJSON_IsString(func_item)) ? func_item->valuestring : "";
+        
+        // 解析list数组
+        void **list_array = NULL;
+        int list_count = 0;
+        
+        if (list_item != NULL && cJSON_IsArray(list_item)) {
+            list_count = cJSON_GetArraySize(list_item);
+            if (list_count > 0) {
+                list_array = malloc(sizeof(void *) * list_count);
+                if (list_array != NULL) {
+                    int i = 0;
+                    cJSON *list_elem = NULL;
+                    cJSON_ArrayForEach(list_elem, list_item) {
+                        if (i >= list_count) break;
+                        
+                        if (cJSON_IsString(list_elem)) {
+                            char *item_str = strdup(list_elem->valuestring);
+                            list_array[i] = item_str;
+                        } else {
+                            // 如果不是字符串，转换为字符串表示
+                            char *item_str = cJSON_PrintUnformatted(list_elem);
+                            list_array[i] = item_str;
+                        }
+                        i++;
+                    }
+                }
+            }
+        }
+        
+        // 解析outputs数组
+        void **outputs_array = NULL;
+        int outputs_count = 0;
+        
+        if (outputs_item != NULL && cJSON_IsArray(outputs_item)) {
+            outputs_count = cJSON_GetArraySize(outputs_item);
+            if (outputs_count > 0) {
+                outputs_array = malloc(sizeof(void *) * outputs_count);
+                if (outputs_array != NULL) {
+                    int i = 0;
+                    cJSON *output_elem = NULL;
+                    cJSON_ArrayForEach(output_elem, outputs_item) {
+                        if (i >= outputs_count) break;
+                        
+                        // 将每个输出元素转换为字符串表示
+                        char *output_str = cJSON_PrintUnformatted(output_elem);
+                        outputs_array[i] = output_str;
+                        i++;
+                    }
+                }
+            }
+        }
+        
+        // 调用回调函数
+        callback(id, type, func, list_array, list_count, outputs_array, outputs_count, user_data);
+        block_count++;
+        
+        // 清理当前block分配的内存
+        if (list_array != NULL) {
+            for (int i = 0; i < list_count; i++) {
+                if (list_array[i] != NULL) {
+                    free(list_array[i]);
+                }
+            }
+            free(list_array);
+        }
+        
+        if (outputs_array != NULL) {
+            for (int i = 0; i < outputs_count; i++) {
+                if (outputs_array[i] != NULL) {
+                    free(outputs_array[i]);
+                }
+            }
+            free(outputs_array);
+        }
+    }
+    
+    // 清理cJSON对象
+    cJSON_Delete(root);
+    
+    if (block_count == 0) {
+        fprintf(stderr, "Warning: No valid blocks found in JSON file\n");
+        return -1;
+    }
+    
+    printf("JSON parsing completed: %d blocks processed\n", block_count);
+    return 0;
+}
+
+// =============================================================================
+// YAML 解析函数实现 (占位符)
+// =============================================================================
+
+static int parse_yaml_file(const char *filename, config_block_callback_t callback, void *user_data)
+{
+    // TODO: 实现 YAML 解析
+    fprintf(stderr, "YAML parsing not yet implemented for file: %s\n", filename);
+    return -1;
 }

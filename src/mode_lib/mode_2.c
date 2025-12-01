@@ -45,7 +45,14 @@ static int func_2(struct my_node *self)
 
 static void *func_2_out(struct my_node *self, int arg_n)
 {
-    return &((int *)self->self.arg)[2];
+    switch (arg_n) { 
+        case 0: 
+            return &((int *)self->self.arg)[2];
+        break;
+        default:
+        break;
+    }
+    return NULL;
 }
 
 

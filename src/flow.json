@@ -1,0 +1,51 @@
+{
+  "blocks": [
+    {
+      "id": "start1",
+      "type": "start",
+      "list": ["relay1"]
+    },
+    {
+      "id": "relay1",
+      "func": "mode_1",
+      "type": "relay",
+      "list": ["relay2"],
+      "outputs": [
+        [
+          ["relay2", 1],
+          ["relay3", 2]
+        ],
+        [
+          ["relay2", 1],
+          ["relay1", 1]
+        ]
+      ]
+    },
+    {
+      "id": "relay2",
+      "func": "mode_2",
+      "type": "branch",
+      "list": ["relay3", "relay4"],
+      "outputs": [
+        [
+          ["relay3"]
+        ]
+      ]
+    },
+    {
+      "id": "relay4",
+      "func": "mode_1",
+      "type": "relay",
+      "list": ["relay3"],
+      "outputs": [
+        [
+          ["relay3"]
+        ]
+      ]
+    },
+    {
+      "id": "relay3",
+      "type": "end"
+    }
+  ]
+}

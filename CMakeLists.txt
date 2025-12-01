@@ -225,6 +225,16 @@ else()
     message(FATAL_ERROR "YAML library not found - required for YAML parsing")
 endif()
 
+# cJSON library (required for JSON parsing)
+find_library(CJSON_LIBRARY cjson)
+if(CJSON_LIBRARY)
+    target_link_libraries(VoltageMonitor PRIVATE ${CJSON_LIBRARY})
+    target_compile_definitions(VoltageMonitor PRIVATE HAVE_CJSON=1)
+    message(STATUS "Found cJSON library: YES")
+else()
+    message(FATAL_ERROR "cJSON library not found - required for JSON parsing")
+endif()
+
 # =============================================================================
 # Project Information
 # =============================================================================

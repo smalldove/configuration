@@ -34,14 +34,22 @@ static int func_3(struct my_node *self)
     }
     
     // 重置路径
-    self->next[0] = self->next_table[((int*)self->self.arg)[0] > ((int*)self->self.arg)[0] ? 0 : 1];
+    self->next[0] = self->next_table[((int*)self->self.arg)[0] > ((int*)self->self.arg)[1] ? 0 : 1];
 
     return 0;
 }
 
 static void *func_3_out(struct my_node *self, int arg_n)
 {
-    return &((int *)self->self.arg)[3];
+    switch (arg_n) { 
+        case 0: 
+            return &((int *)self->self.arg)[3];
+        break;
+        default:
+        break;
+    }
+
+    return NULL;
 }
 
 

@@ -22,17 +22,17 @@ void cleanup_cfg_registry(void);
 int get_cfg_tree_height_info(int *max_height);
 
 // =============================================================================
-// YAML 解析函数
+// 配置文件解析函数 (支持YAML和JSON)
 // =============================================================================
 
-// 解析 flow.yaml 文件的回调函数类型
-typedef void (*yaml_block_callback_t)(const char *id, const char *type, const char *func, 
-                                     void **list_array, int list_count,
-                                     void **outputs_array, int outputs_count,
-                                     void *user_data);
+// 解析配置文件的回调函数类型
+typedef void (*config_block_callback_t)(const char *id, const char *type, const char *func, 
+                                       void **list_array, int list_count,
+                                       void **outputs_array, int outputs_count,
+                                       void *user_data);
 
-// 解析 flow.yaml 文件的主函数
-int parse_flow_yaml(const char *filename, yaml_block_callback_t callback, void *user_data);
+// 解析 flow.yaml 文件的主函数 (支持YAML和JSON)
+int parse_flow_yaml(const char *filename, config_block_callback_t callback, void *user_data);
 
 // 示例回调函数 - 用于演示如何访问解析的数据
 void example_block_callback(const char *id, const char *type, const char *func, 
