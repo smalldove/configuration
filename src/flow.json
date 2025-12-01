@@ -2,8 +2,19 @@
   "blocks": [
     {
       "id": "start1",
+      "func": "mode_1",
       "type": "start",
-      "list": ["relay1"]
+      "list": ["relay1"],
+      "outputs": [
+        [
+          ["relay2", 1],
+          ["relay3", 2]
+        ],
+        [
+          ["relay2", 1],
+          ["relay1", 1]
+        ]
+      ]
     },
     {
       "id": "relay1",
@@ -45,7 +56,14 @@
     },
     {
       "id": "relay3",
-      "type": "end"
+      "type": "end",
+      "func": "mode_1",
+      "list": [],
+      "outputs": [
+        [
+          ["relay3"]
+        ]
+      ]
     }
   ]
 }

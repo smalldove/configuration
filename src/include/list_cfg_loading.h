@@ -29,7 +29,7 @@ int get_cfg_tree_height_info(int *max_height);
 typedef void (*config_block_callback_t)(const char *id, const char *type, const char *func, 
                                        void **list_array, int list_count,
                                        void **outputs_array, int outputs_count,
-                                       void *user_data);
+                                       void *user_data, struct my_node *node);
 
 // 解析 flow.yaml 文件的主函数 (支持YAML和JSON)
 int parse_flow_yaml(const char *filename, config_block_callback_t callback, void *user_data);
@@ -38,7 +38,7 @@ int parse_flow_yaml(const char *filename, config_block_callback_t callback, void
 void example_block_callback(const char *id, const char *type, const char *func, 
                            void **list_array, int list_count,
                            void **outputs_array, int outputs_count,
-                           void *user_data);
+                           void *user_data, struct my_node *node);
 
 // 预设调用变量的示例函数
 void parse_flow_yaml_example(void);

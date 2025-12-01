@@ -19,10 +19,10 @@ static int func_1_in(struct my_node *self, void *arg, int arg_n)
 {
     switch (arg_n) { 
         case 0: 
-            ((int*)self->self.arg)[0] = *(int*)arg;
+            ((int*)self->self->arg)[0] = *(int*)arg;
         break;
         case 1: 
-            ((int*)self->self.arg)[1] = *(int*)arg;
+            ((int*)self->self->arg)[1] = *(int*)arg;
         default:
         break;
     }
@@ -32,11 +32,11 @@ static int func_1_in(struct my_node *self, void *arg, int arg_n)
 
 static int func_1(struct my_node *self)
 {
-    if(NULL == self && NULL == self->self.arg)
+    if(NULL == self && NULL == self->self->arg)
     {
         return -1;
     }
-    *(int*)(self->self.arg) += 2;
+    *(int*)(self->self->arg) += 2;
     printf("func_1 执行");
     return 0;
 }
@@ -45,10 +45,10 @@ static void *func_1_out(struct my_node *self, int arg_n)
 {
     switch (arg_n) { 
         case 0: 
-            return &((int*)self->self.arg)[0];
+            return &((int*)self->self->arg)[0];
         break;
         case 1: 
-            return &((int*)self->self.arg)[1];
+            return &((int*)self->self->arg)[1];
         default:
         break;
     }

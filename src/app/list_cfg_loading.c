@@ -123,18 +123,63 @@ void iterate_all_cfg_nodes(void (*callback)(struct my_node *node, void *arg), vo
 }
 
 // 清理配置平衡树（程序退出时调用）
-static void free_cfg_node_action(const void *node, VISIT order, int level) {
+static cfg_tree_node_t **cfg_node_array = NULL;
+static size_t cfg_node_array_size = 0;
+static size_t cfg_node_array_capacity = 0;
+
+static void collect_cfg_node_action(const void *node, VISIT order, int level) {
     if (order == postorder || order == leaf) {
         cfg_tree_node_t *tree_node = *(cfg_tree_node_t **)node;
-        free(tree_node->key);
-        free(tree_node);
+        if (cfg_node_array_size >= cfg_node_array_capacity) {
+            size_t new_capacity = cfg_node_array_capacity == 0 ? 8 : cfg_node_array_capacity * 2;
+            cfg_tree_node_t **new_array = realloc(cfg_node_array, new_capacity * sizeof(cfg_tree_node_t *));
+            if (new_array == NULL) {
+                return;
+            }
+            cfg_node_array = new_array;
+            cfg_node_array_capacity = new_capacity;
+        }
+        cfg_node_array[cfg_node_array_size++] = tree_node;
     }
 }
 
 void cleanup_cfg_registry(void)
 {
-    // 使用twalk遍历并释放所有节点
-    twalk(cfg_tree_root, free_cfg_node_action);
+    // 收集所有节点指针
+    cfg_node_array = NULL;
+    cfg_node_array_size = 0;
+    cfg_node_array_capacity = 0;
+    twalk(cfg_tree_root, collect_cfg_node_action);
+    
+    // 对每个收集到的节点，从树中删除并释放内存
+    for (size_t i = 0; i < cfg_node_array_size; i++) {
+        cfg_tree_node_t *node = cfg_node_array[i];
+        // 从树中删除节点（释放内部节点）
+        tdelete(node, &cfg_tree_root, cfg_string_compare);
+        
+        // 释放 my_node 结构体
+        if (node->node_ptr != NULL) {
+            if (node->node_ptr->self) {
+                struct func_attribute *self = node->node_ptr->self;
+                if (self->arg != NULL) {
+                    free(self->arg);
+                }
+                free(self);
+            }
+            free(node->node_ptr);
+        }
+        
+        // 释放节点内存
+        free(node->key);
+        free(node);
+    }
+    
+    // 释放节点数组
+    free(cfg_node_array);
+    cfg_node_array = NULL;
+    cfg_node_array_size = 0;
+    cfg_node_array_capacity = 0;
+    
     cfg_tree_root = NULL;
     cfg_node_count = 0;
 }
@@ -166,7 +211,7 @@ int get_cfg_tree_height_info(int *max_height)
 typedef void (*config_block_callback_t)(const char *id, const char *type, const char *func, 
                                        void **list_array, int list_count,
                                        void **outputs_array, int outputs_count,
-                                       void *user_data);
+                                       void *user_data, struct my_node *node);
 
 // 函数声明
 static const char *get_file_extension(const char *filename);
@@ -187,27 +232,27 @@ static const char *get_file_extension(const char *filename)
 int parse_flow_yaml(const char *filename, config_block_callback_t callback, void *user_data)
 {
     // 检查文件扩展名
-    const char *ext = get_file_extension(filename);
+    // const char *ext = get_file_extension(filename);
     
-    if (strcasecmp(ext, "yaml") == 0 || strcasecmp(ext, "yml") == 0) {
-        return parse_yaml_file(filename, callback, user_data);
-    } else if (strcasecmp(ext, "json") == 0) {
-        return parse_json_file(filename, callback, user_data);
-    } else {
-        // 默认尝试YAML，如果失败则尝试JSON
-        int result = parse_yaml_file(filename, callback, user_data);
-        if (result != 0) {
-            result = parse_json_file(filename, callback, user_data);
-        }
+    // if (strcasecmp(ext, "yaml") == 0 || strcasecmp(ext, "yml") == 0) {
+    //     return parse_yaml_file(filename, callback, user_data);
+    // } else if (strcasecmp(ext, "json") == 0) {
+    //     return parse_json_file(filename, callback, user_data);
+    // } else {
+        // // 暂时先用json实现，yaml解析需优化
+        // int result = parse_yaml_file(filename, callback, user_data);
+        // if (result != 0) {
+            int result = parse_json_file(filename, callback, user_data);
+        // }
         return result;
-    }
+    // }
 }
 
 // 示例回调函数 - 用于演示如何访问解析的数据
 void example_block_callback(const char *id, const char *type, const char *func, 
                            void **list_array, int list_count,
                            void **outputs_array, int outputs_count,
-                           void *user_data)
+                           void *user_data, struct my_node *node)
 {
     printf("Block found:\n");
     printf("  ID: %s\n", id);
@@ -225,7 +270,57 @@ void example_block_callback(const char *id, const char *type, const char *func,
         printf("  Outputs: %d\n", outputs_count);
         // 这里可以进一步解析 outputs 数组的内容
     }
+
+    if (node == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for node\n");
+        return;
+    }
+
+    // 基于入参信息填充 node 的属性
+    // 1. 设置 id_name
+    if (id != NULL) {
+        strncpy(node->id_name, id, sizeof(node->id_name) - 1);
+        node->id_name[sizeof(node->id_name) - 1] = '\0';
+    } else {
+        node->id_name[0] = '\0';
+    }
+
+    // 2. 设置 type (将字符串类型转换为枚举类型)
+    if (type != NULL) {
+        if (strcmp(type, "start") == 0) {
+            node->type = NODE_START;
+        } else if (strcmp(type, "end") == 0) {
+            node->type = NODE_END;
+        } else if (strcmp(type, "relay") == 0) {
+            node->type = NODE_RELAY;
+        } else if (strcmp(type, "branch") == 0) {
+            node->type = NODE_FANSHAPED;  // branch 对应扇形节点
+        } else if (strcmp(type, "switch") == 0) {
+            node->type = NODE_SWITCH;
+        } else {
+            node->type = NODE_RELAY;  // 默认值
+        }
+    } else {
+        node->type = NODE_RELAY;  // 默认值
+    }
+
+    // 3. 初始化链表
+    for (int i = 0; i < 32; i++) {
+        INIT_LIST_HEAD(&node->next[i]);
+        INIT_LIST_HEAD(&node->next_table[i]);
+    }
+    INIT_LIST_HEAD(&node->out_list);
+    INIT_LIST_HEAD(&node->out_list_table);
+
+    // 4. 设置 func_attribute 结构体
+    // 这里可以根据 func 参数设置具体的函数指针，目前先初始化为默认值
+    REG_MODE_FUNC_T reg_node_func = find_function_by_id(func);
+    node->self = reg_node_func();
+
+    // 用 id 作为 key，node 的值即实例的地址作为 value，存入平衡树中
+    register_cfg_node(id, node);
     
+    printf("  Node registered to global tree with ID: %s\n", id);
     printf("\n");
 }
 
@@ -252,6 +347,34 @@ void parse_flow_yaml_example(void)
 // =============================================================================
 // JSON 解析函数实现 (使用cJSON库)
 // =============================================================================
+
+enum Node_type get_type(const char *type)
+{
+    enum Node_type ret = NODE_NON;
+    if(strcmp(type, "start"))
+    {
+        ret = NODE_FANSHAPED;
+    }
+    else if(strcmp(type, "start"))
+    {
+        ret = NODE_RELAY;
+    }
+    else if(strcmp(type, "start"))
+    {
+        ret = NODE_SWITCH;
+    }
+    else if(strcmp(type, "start"))
+    {
+        ret = NODE_START;
+    }
+    else if(strcmp(type, "start"))
+    {
+        ret = NODE_END;
+    }
+    
+    
+    return ret;
+}
 
 // 使用cJSON库解析JSON文件的函数
 static int parse_json_file(const char *filename, config_block_callback_t callback, void *user_data)
@@ -310,6 +433,32 @@ static int parse_json_file(const char *filename, config_block_callback_t callbac
     
     int block_count = 0;
     cJSON *block_item = NULL;
+    
+      // 遍历所有blocks
+    cJSON_ArrayForEach(block_item, blocks) {
+        if (!cJSON_IsObject(block_item)) {
+            fprintf(stderr, "Warning: Block item is not an object, skipping\n");
+            continue;
+        }
+        
+        // 解析block中的字段
+        cJSON *id_item = cJSON_GetObjectItemCaseSensitive(block_item, "id");
+        cJSON *type_item = cJSON_GetObjectItemCaseSensitive(block_item, "type");
+        cJSON *func_item = cJSON_GetObjectItemCaseSensitive(block_item, "func");
+
+        if(NULL == id_item && NULL == type_item && NULL == func_item )
+        {
+            continue;
+        }
+
+        struct my_node *node = calloc(sizeof(struct my_node), 1);
+        
+        strncpy(node->id_name, id_item->valuestring, NODE_ID);
+        node->type = get_type(type_item->valuestring);
+
+        register_cfg_node(id_item->valuestring, node);
+
+    }
     
     // 遍历所有blocks
     cJSON_ArrayForEach(block_item, blocks) {
@@ -388,7 +537,7 @@ static int parse_json_file(const char *filename, config_block_callback_t callbac
         }
         
         // 调用回调函数
-        callback(id, type, func, list_array, list_count, outputs_array, outputs_count, user_data);
+        callback(id, type, func, list_array, list_count, outputs_array, outputs_count, user_data, find_node_by_cfg_id(id));
         block_count++;
         
         // 清理当前block分配的内存
@@ -410,6 +559,7 @@ static int parse_json_file(const char *filename, config_block_callback_t callbac
             free(outputs_array);
         }
     }
+
     
     // 清理cJSON对象
     cJSON_Delete(root);

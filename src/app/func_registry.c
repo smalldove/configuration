@@ -114,18 +114,50 @@ void iterate_all_functions(void (*callback)(REG_MODE_FUNC_T func, void *arg), vo
 }
 
 // 清理平衡树（程序退出时调用）
-static void free_node_action(const void *node, VISIT order, int level) {
+static tree_node_t **node_array = NULL;
+static size_t node_array_size = 0;
+static size_t node_array_capacity = 0;
+
+static void collect_node_action(const void *node, VISIT order, int level) {
     if (order == postorder || order == leaf) {
         tree_node_t *tree_node = *(tree_node_t **)node;
-        free(tree_node->key);
-        free(tree_node);
+        if (node_array_size >= node_array_capacity) {
+            size_t new_capacity = node_array_capacity == 0 ? 8 : node_array_capacity * 2;
+            tree_node_t **new_array = realloc(node_array, new_capacity * sizeof(tree_node_t *));
+            if (new_array == NULL) {
+                return;
+            }
+            node_array = new_array;
+            node_array_capacity = new_capacity;
+        }
+        node_array[node_array_size++] = tree_node;
     }
 }
 
 void cleanup_func_registry(void)
 {
-    // 使用twalk遍历并释放所有节点
-    twalk(tree_root, free_node_action);
+    // 收集所有节点指针
+    node_array = NULL;
+    node_array_size = 0;
+    node_array_capacity = 0;
+    twalk(tree_root, collect_node_action);
+    
+    // 对每个收集到的节点，从树中删除并释放内存
+    for (size_t i = 0; i < node_array_size; i++) {
+        tree_node_t *node = node_array[i];
+        // 从树中删除节点（释放内部节点）
+        tdelete(node, &tree_root, string_compare);
+        // 释放节点内存
+        free(node->key);
+        free(node);
+    }
+    
+    // 释放节点数组
+    free(node_array);
+    node_array = NULL;
+    node_array_size = 0;
+    node_array_capacity = 0;
+    
     tree_root = NULL;
     func_count = 0;
 }
@@ -136,7 +168,7 @@ static int *current_max_height = NULL;
 static void height_action(const void *node, VISIT order, int level) {
     if (level > *current_max_height) {
         *current_max_height = level;
-    }
+    }    
 }
 
 int get_tree_height_info(int *max_height)

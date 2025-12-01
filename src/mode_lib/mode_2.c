@@ -20,9 +20,9 @@ static int func_2_in(struct my_node *self, void *arg, int arg_n)
     }
     switch (arg_n) { 
         case 0: 
-            ((int*)(self->self.arg))[0] = *(int*)arg;
+            ((int*)(self->self->arg))[0] = *(int*)arg;
         break;
-            ((int*)(self->self.arg))[1] = *(int*)arg;
+            ((int*)(self->self->arg))[1] = *(int*)arg;
         default:
         break;
     }
@@ -32,13 +32,13 @@ static int func_2_in(struct my_node *self, void *arg, int arg_n)
 
 static int func_2(struct my_node *self)
 {
-    if(NULL == self || NULL == self->self.arg)
+    if(NULL == self || NULL == self->self->arg)
     {
         return 0;
     }
     
     // 重置路径
-    self->next[0] = self->next_table[((int*)self->self.arg)[0] > ((int*)self->self.arg)[0] ? 0 : 1];
+    self->next[0] = self->next_table[((int*)self->self->arg)[0] > ((int*)self->self->arg)[0] ? 0 : 1];
 
     return 0;
 }
@@ -47,7 +47,7 @@ static void *func_2_out(struct my_node *self, int arg_n)
 {
     switch (arg_n) { 
         case 0: 
-            return &((int *)self->self.arg)[2];
+            return &((int *)self->self->arg)[2];
         break;
         default:
         break;

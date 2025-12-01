@@ -11,7 +11,8 @@ enum Node_type
     NODE_END,
     NODE_RELAY,
     NODE_FANSHAPED,
-    NODE_SWITCH
+    NODE_SWITCH,
+    NODE_NON
 };
 
 
@@ -50,9 +51,10 @@ struct func_attribute
 
 };
 
+#define NODE_ID 64
 struct my_node {
 
-    char id_name[64];                   // 实例名称
+    char id_name[NODE_ID];                   // 实例名称
     
     enum Node_type type;
 
@@ -63,7 +65,7 @@ struct my_node {
     struct list_head out_list;          // 输出指向的调用表
     struct list_head out_list_table;    // 输出指向的实例总表
     
-    struct func_attribute self;
+    struct func_attribute *self;
 };
 
 #endif
