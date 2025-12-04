@@ -1,5 +1,6 @@
 #include "func_public.h"
 #include "func_registry.h"
+#include "list.h"
 #include "list_cfg_loading.h"
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,16 @@ typedef struct cfg_tree_node {
     char *key;                    // yaml配置中的id字符串
     struct my_node *node_ptr;     // 对应的my_node结构体地址
 } cfg_tree_node_t;
+
+
+struct _temp_out_info_list
+{
+    int arg_out[LIST_MAX];
+    char *out_list[LIST_MAX];
+    int arg_in[LIST_MAX];
+    int num;
+};
+
 
 // 全局配置平衡树根节点
 static void *cfg_tree_root = NULL;
@@ -215,8 +226,8 @@ typedef void (*config_block_callback_t)(const char *id, const char *type, const 
 
 // 函数声明
 static const char *get_file_extension(const char *filename);
-static int parse_yaml_file(const char *filename, config_block_callback_t callback, void *user_data);
-static int parse_json_file(const char *filename, config_block_callback_t callback, void *user_data);
+static int parse_yaml_file(const char *filename, void *user_data);
+static int parse_json_file(const char *filename, void *user_data);
 
 // 获取文件扩展名
 static const char *get_file_extension(const char *filename)
@@ -229,7 +240,7 @@ static const char *get_file_extension(const char *filename)
 }
 
 // 解析 flow.yaml 文件的主函数
-int parse_flow_yaml(const char *filename, config_block_callback_t callback, void *user_data)
+int parse_flow_yaml(const char *filename, void *user_data)
 {
     // 检查文件扩展名
     // const char *ext = get_file_extension(filename);
@@ -242,7 +253,7 @@ int parse_flow_yaml(const char *filename, config_block_callback_t callback, void
         // // 暂时先用json实现，yaml解析需优化
         // int result = parse_yaml_file(filename, callback, user_data);
         // if (result != 0) {
-            int result = parse_json_file(filename, callback, user_data);
+            int result = parse_json_file(filename, user_data);
         // }
         return result;
     // }
@@ -250,8 +261,8 @@ int parse_flow_yaml(const char *filename, config_block_callback_t callback, void
 
 // 示例回调函数 - 用于演示如何访问解析的数据
 void example_block_callback(const char *id, const char *type, const char *func, 
-                           void **list_array, int list_count,
-                           void **outputs_array, int outputs_count,
+                           char **list_array, int list_count,
+                           struct _temp_out_info_list *outputs_array, int outputs_count,
                            void *user_data, struct my_node *node)
 {
     printf("Block found:\n");
@@ -260,11 +271,7 @@ void example_block_callback(const char *id, const char *type, const char *func,
     if (func && func[0] != '\0') {
         printf("  Function: %s\n", func);
     }
-    
-    if (list_count > 0) {
-        printf("  List items: %d\n", list_count);
-        // 这里可以进一步解析 list 数组的内容
-    }
+
     
     if (outputs_count > 0) {
         printf("  Outputs: %d\n", outputs_count);
@@ -276,6 +283,53 @@ void example_block_callback(const char *id, const char *type, const char *func,
         return;
     }
 
+    struct my_node *temp_node = NULL;
+    for(int i = 0; i < list_count && i < LIST_MAX; i++)
+    {
+        temp_node = find_node_by_cfg_id(list_array[i]);
+        if(temp_node)
+        {
+            node->next_table[i].next = &temp_node->link;
+            node->next_table[i].prev = node->next_table[i].next;
+
+        }
+        else 
+        {
+            printf("没找到:%s", list_array[i]);
+            node->next_table[i].next = NULL;
+            node->next_table[i].prev = node->next_table[i].next;
+        }
+        node->next[i].next = node->next_table[i].next;
+        node->next[i].prev = node->next_table[i].next;
+
+    }
+    
+
+    for(int i = 0; i < outputs_count && i < LIST_MAX; i++)
+    {
+        
+        for (int j = 0; j < outputs_array[i].num; j++) {
+            temp_node = find_node_by_cfg_id(outputs_array[i].out_list[j]);
+            
+            if(temp_node)
+            {
+                node->out_list_table[i].out_list.next = &temp_node->link;
+                node->out_list_table[i].out_list.prev = node->next_table[i].next;
+            }
+            else 
+            {
+                node->out_list_table[i].out_list.next = NULL;
+                node->out_list_table[i].out_list.prev = node->next_table[i].next;
+            }
+            
+            node->out_list[i].out_list.next = node->next_table[i].next;
+            node->out_list[i].out_list.prev = node->next_table[i].next;
+
+            node->out_list[i].arg_n = outputs_array[i].arg_out[j];
+        }
+    
+    }
+
     // 基于入参信息填充 node 的属性
     // 1. 设置 id_name
     if (id != NULL) {
@@ -284,35 +338,6 @@ void example_block_callback(const char *id, const char *type, const char *func,
     } else {
         node->id_name[0] = '\0';
     }
-
-    // 2. 设置 type (将字符串类型转换为枚举类型)
-    if (type != NULL) {
-        if (strcmp(type, "start") == 0) {
-            node->type = NODE_START;
-        } else if (strcmp(type, "end") == 0) {
-            node->type = NODE_END;
-        } else if (strcmp(type, "relay") == 0) {
-            node->type = NODE_RELAY;
-        } else if (strcmp(type, "branch") == 0) {
-            node->type = NODE_FANSHAPED;  // branch 对应扇形节点
-        } else if (strcmp(type, "switch") == 0) {
-            node->type = NODE_SWITCH;
-        } else {
-            node->type = NODE_RELAY;  // 默认值
-        }
-    } else {
-        node->type = NODE_RELAY;  // 默认值
-    }
-
-    // 3. 初始化链表
-    for (int i = 0; i < 32; i++) {
-        INIT_LIST_HEAD(&node->next[i]);
-        INIT_LIST_HEAD(&node->next_table[i]);
-    }
-    INIT_LIST_HEAD(&node->out_list);
-    INIT_LIST_HEAD(&node->out_list_table);
-
-    // 4. 设置 func_attribute 结构体
     // 这里可以根据 func 参数设置具体的函数指针，目前先初始化为默认值
     REG_MODE_FUNC_T reg_node_func = find_function_by_id(func);
     node->self = reg_node_func();
@@ -331,11 +356,10 @@ void parse_flow_yaml_example(void)
     
     // 预设调用变量
     const char *filename = "/home/xcvbnm/configuration/src/flow.json";
-    config_block_callback_t callback = example_block_callback;
     void *user_data = NULL;  // 可以传递任意用户数据
     
     // 调用解析函数
-    int result = parse_flow_yaml(filename, callback, user_data);
+    int result = parse_flow_yaml(filename, user_data);
     
     if (result == 0) {
         printf("=== 解析完成 ===\n");
@@ -377,9 +401,9 @@ enum Node_type get_type(const char *type)
 }
 
 // 使用cJSON库解析JSON文件的函数
-static int parse_json_file(const char *filename, config_block_callback_t callback, void *user_data)
+static int parse_json_file(const char *filename, void *user_data)
 {
-    if (filename == NULL || callback == NULL) {
+    if (filename == NULL) {
         return -1;
     }
     
@@ -455,6 +479,7 @@ static int parse_json_file(const char *filename, config_block_callback_t callbac
         
         strncpy(node->id_name, id_item->valuestring, NODE_ID);
         node->type = get_type(type_item->valuestring);
+        INIT_LIST_HEAD(&node->link);
 
         register_cfg_node(id_item->valuestring, node);
 
@@ -486,13 +511,13 @@ static int parse_json_file(const char *filename, config_block_callback_t callbac
         const char *func = (func_item != NULL && cJSON_IsString(func_item)) ? func_item->valuestring : "";
         
         // 解析list数组
-        void **list_array = NULL;
-        int list_count = 0;
+        char **list_array = NULL;
+        int list_count = 0, lists_count = 0;
         
         if (list_item != NULL && cJSON_IsArray(list_item)) {
             list_count = cJSON_GetArraySize(list_item);
             if (list_count > 0) {
-                list_array = malloc(sizeof(void *) * list_count);
+                list_array = calloc(sizeof(char *) , list_count);
                 if (list_array != NULL) {
                     int i = 0;
                     cJSON *list_elem = NULL;
@@ -503,9 +528,7 @@ static int parse_json_file(const char *filename, config_block_callback_t callbac
                             char *item_str = strdup(list_elem->valuestring);
                             list_array[i] = item_str;
                         } else {
-                            // 如果不是字符串，转换为字符串表示
-                            char *item_str = cJSON_PrintUnformatted(list_elem);
-                            list_array[i] = item_str;
+                            printf("list 配置错误");
                         }
                         i++;
                     }
@@ -514,22 +537,54 @@ static int parse_json_file(const char *filename, config_block_callback_t callbac
         }
         
         // 解析outputs数组
-        void **outputs_array = NULL;
+        struct _temp_out_info_list *outputs_array = NULL;
         int outputs_count = 0;
+        struct my_node *tmp = NULL;
         
         if (outputs_item != NULL && cJSON_IsArray(outputs_item)) {
             outputs_count = cJSON_GetArraySize(outputs_item);
             if (outputs_count > 0) {
-                outputs_array = malloc(sizeof(void *) * outputs_count);
+                outputs_array = calloc(sizeof(struct _temp_out_info_list) , outputs_count);
                 if (outputs_array != NULL) {
-                    int i = 0;
                     cJSON *output_elem = NULL;
+                    cJSON *output_elems = NULL;
+                    int i = 0, j = 0, elem_num = 0;
+
                     cJSON_ArrayForEach(output_elem, outputs_item) {
                         if (i >= outputs_count) break;
+                        j = 0;
+                        lists_count = cJSON_GetArraySize(output_elem);
+                        outputs_array[i].num = lists_count;
+                        elem_num = cJSON_GetArraySize(output_elem);
+                        if(elem_num == 3)
+                        {
+                            cJSON_ArrayForEach(output_elems, output_elem) 
+                            {
+                                switch (j) {
+                                    case 0:
+                                        outputs_array[i].arg_out[j] = output_elem->valueint;
+
+                                    break;
+
+                                    case 1:
+                                        outputs_array[i].out_list[j] = output_elem->valuestring;
+
+                                    break;
+
+                                    case 2:
+                                        outputs_array[i].arg_in[j] = output_elem->valueint;
+                                    break;
+                                
+                                }
+                            }
+                            j++;
+
+                        }
+                        else 
+                        {
+                            printf("配置错误");
+                        }
                         
-                        // 将每个输出元素转换为字符串表示
-                        char *output_str = cJSON_PrintUnformatted(output_elem);
-                        outputs_array[i] = output_str;
                         i++;
                     }
                 }
@@ -537,7 +592,7 @@ static int parse_json_file(const char *filename, config_block_callback_t callbac
         }
         
         // 调用回调函数
-        callback(id, type, func, list_array, list_count, outputs_array, outputs_count, user_data, find_node_by_cfg_id(id));
+        example_block_callback(id, type, func, list_array, list_count, outputs_array, outputs_count, user_data, find_node_by_cfg_id(id));
         block_count++;
         
         // 清理当前block分配的内存
@@ -551,11 +606,6 @@ static int parse_json_file(const char *filename, config_block_callback_t callbac
         }
         
         if (outputs_array != NULL) {
-            for (int i = 0; i < outputs_count; i++) {
-                if (outputs_array[i] != NULL) {
-                    free(outputs_array[i]);
-                }
-            }
             free(outputs_array);
         }
     }
@@ -577,7 +627,7 @@ static int parse_json_file(const char *filename, config_block_callback_t callbac
 // YAML 解析函数实现 (占位符)
 // =============================================================================
 
-static int parse_yaml_file(const char *filename, config_block_callback_t callback, void *user_data)
+static int parse_yaml_file(const char *filename, void *user_data)
 {
     // TODO: 实现 YAML 解析
     fprintf(stderr, "YAML parsing not yet implemented for file: %s\n", filename);
