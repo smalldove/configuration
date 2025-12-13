@@ -235,6 +235,22 @@ else()
     message(FATAL_ERROR "cJSON library not found - required for JSON parsing")
 endif()
 
+# Concurrency Kit (ck) library (required for high-performance queues)
+set(CK_LIBRARY_PATH /home/xcvbnm/ck-0.7.2/src/libck.a)
+set(CK_INCLUDE_PATH /home/xcvbnm/ck-0.7.2/include)
+
+if(EXISTS ${CK_LIBRARY_PATH} AND EXISTS ${CK_INCLUDE_PATH})
+    target_link_libraries(VoltageMonitor PRIVATE ${CK_LIBRARY_PATH})
+    target_include_directories(VoltageMonitor PRIVATE ${CK_INCLUDE_PATH})
+    target_compile_definitions(VoltageMonitor PRIVATE HAVE_CK=1)
+    message(STATUS "Found Concurrency Kit (ck) library: YES")
+    message(STATUS "  Library: ${CK_LIBRARY_PATH}")
+    message(STATUS "  Include: ${CK_INCLUDE_PATH}")
+else()
+    message(WARNING "Concurrency Kit (ck) library not found at ${CK_LIBRARY_PATH}")
+    message(WARNING "Continuing without ck library support")
+endif()
+
 # =============================================================================
 # Project Information
 # =============================================================================

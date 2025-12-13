@@ -55,7 +55,7 @@ static void *func_3_out(struct my_node *self, int arg_n)
 
 struct func_attribute *init_mode_3(void)
 {
-    struct func_attribute *self = calloc(sizeof(struct my_node), 1);
+    struct func_attribute *self = calloc(sizeof(struct func_attribute), 1);
     self->arg = calloc(sizeof(int), 1);
     self->func = func_3;
 

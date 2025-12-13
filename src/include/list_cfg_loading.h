@@ -4,7 +4,7 @@
 #include "func_public.h"
 
 // 注册配置节点到平衡树
-void register_cfg_node(const char *cfg_id, struct my_node *node);
+int register_cfg_node(const char *cfg_id, struct my_node *node);
 
 // 根据配置ID查找节点
 struct my_node *find_node_by_cfg_id(const char *cfg_id);

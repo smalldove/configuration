@@ -1,8 +1,239 @@
+#include "list.h"
+#define _POSIX_C_SOURCE 200809L
+#include "actuator.h"
 #include "func_public.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <time.h>
+#include <signal.h>
+#include <string.h>
 
-
-
-int actuator_ini(void)
+// 初始化执行器模块
+struct actuator_thread_t *actuator_ini(int production_num, void *(*production_unit)(void *), void *production_arg, int execution_num, void *(*execution_unit)(void *), void *execution_arg)
 {
+    struct actuator_thread_t *act = calloc(sizeof(struct actuator_thread_t), 1);
+
+    if(act)
+    {
+        return NULL;
+    }
+
+
+    act->production_num = production_num;
+    act->production_unit = production_unit;
+    act->production_arg = production_arg;
+    act->execution_num = execution_num;
+    act->execution_unit = execution_unit;
+    act->execution_arg = execution_arg;
+    act->exec_cnt = false;
+    
+    return act;
+}
+
+// 创建线程
+int actuator_create(struct actuator_thread_t *act)
+{
+    if (act == NULL ) {
+        fprintf(stderr, "Invalid arguments for actuator_create\n");
+        return -1;
+    }
+
+    for (int i = 0; i < act->production_num; i++)
+    {
+        act->production_id[i] = 0;
+        int ret = pthread_create(&act->production_id[i], NULL, act->production_unit, act->production_arg);
+        if (ret != 0) {
+            fprintf(stderr, "Failed to create production thread %d: %d\n", i, ret);
+            return -1;
+        }
+    }
+
+    for (int i = 0; i < act->execution_num; i++)
+    {
+        act->execution_id[i] = 0;
+        int ret = pthread_create(&act->execution_id[i], NULL, act->execution_unit, act->execution_arg);
+        if (ret != 0) {
+            fprintf(stderr, "Failed to create execution thread %d: %d\n", i, ret);
+            return -1;
+        }
+    }
+
     return 0;
 }
+
+
+
+/*驱动器-生产分配*/
+void *actuator_production(void *arg)
+{
+    if(NULL == arg)
+    {
+        fprintf(stderr, "NULL参数不可执行");
+        return NULL;
+    }
+
+    
+    struct my_node *queues = NULL;
+    struct exec_buf *tmp = NULL;
+    struct actuator_thread_t *act_arg = arg;
+    
+    
+    struct actuator_pro_arg_t *product_arg = act_arg->production_arg;       // 数据缓冲区
+    struct actuator_exec_arg_t *execution_arg = act_arg->execution_arg;     // 可执行单元队列
+    
+    CK_LIST_INIT(&product_arg->production_head);
+
+
+    while (1) {
+        /*线程优化*/
+        sched_yield();
+        pthread_testcancel();
+        /*
+        工作流说明：数据缓冲区放置待执行的功能单元，遍历可执行队列，如有可调用的执行单元，将功能单元从缓冲区取出，置于执行单元缓冲
+        */
+
+        // 检查队列是否为空
+        if (!CK_LIST_EMPTY(&product_arg->production_head)) {
+            if(!CK_LIST_EMPTY(&execution_arg->execution_head))
+            {
+                tmp = CK_LIST_FIRST(&execution_arg->execution_head);
+                CK_LIST_REMOVE(queues, queue);
+            }
+            // 获取队首元素
+            queues = CK_LIST_FIRST(&product_arg->production_head);
+            // 从队列中移除队首元素
+            CK_LIST_REMOVE(queues, queue);
+            atomic_exchange(&tmp->exec, queues);    // 原子写入
+        }
+    }
+    return NULL;
+}
+
+/*驱动器-执行*/
+void *actuator_execution(void *arg)
+{
+    if(NULL == arg)
+    {
+        fprintf(stderr, "NULL参数不可执行");
+        return NULL;
+    }
+
+    struct actuator_thread_t *act_arg = arg;
+    
+    struct actuator_pro_arg_t *product_arg = act_arg->production_arg;
+    struct actuator_exec_arg_t *execution_arg = act_arg->execution_arg;
+    struct my_node *self_node = execution_arg->buffer[act_arg->exec_cnt % 32].exec;
+    struct exec_buf *tmp = &execution_arg->buffer[act_arg->exec_cnt % 32];
+    
+    struct list_head *pos, *n, *pos_s, *n_s;
+    struct out_list_t *out_item;
+    struct out_my_node_list *out_item_data;
+    while (1) {
+
+        /*线程优化*/
+        sched_yield();
+        pthread_testcancel();
+        // 正确：使用原子存储
+        // atomic_store(&tmp->exec, queue);
+
+        // // 正确：使用原子加载
+        // struct my_node *current = atomic_load(&tmp->exec);
+
+        // // 正确：原子交换
+        // struct my_node *old = atomic_exchange(&tmp->exec, new_ptr);
+        self_node = atomic_load(&tmp->exec);
+        if(self_node)
+        {
+            // 执行节点函数
+            if(self_node->self && self_node->self->func)
+            {
+                self_node->self->func(self_node);
+            }
+
+            // 遍历self_node->out_list
+            list_for_each_safe(pos, n, &self_node->out_list.list)
+            {
+                out_item = list_entry(pos, struct out_list_t, list);
+
+                // list_for_each_safe(pos_s, n_s, &out_item->data.next)
+                // {
+
+                //     // 参数传递
+                //     out_item_data = list_entry(pos_s, struct out_my_node_list, next);
+                //     out_item_data->node->self->in_attribute(out_item_data->node, self_node->self->out_attribute(self_node, out_item_data->arg_in), out_item_data->arg_in);
+                // }
+
+            }
+
+            atomic_store(&tmp->exec, NULL); // 清空执行指针
+
+        }
+    }
+    return NULL;
+}
+
+// // 杀死线程
+// int actuator_kill(struct actuator *act)
+// {
+//     if (act == NULL) {
+//         fprintf(stderr, "Invalid argument for actuator_kill\n");
+//         return -1;
+//     }
+    
+//     if (!act->is_running) {
+//         fprintf(stderr, "Thread is already stopped\n");
+//         return -1;
+//     }
+    
+//     act->is_running = false;
+    
+//     // 等待线程结束
+//     void *retval;
+//     int join_result = pthread_join(act->thread_id, &retval);
+//     if (join_result != 0) {
+//         fprintf(stderr, "Failed to join thread: %d\n", join_result);
+//     }
+    
+//     printf("Thread killed successfully (ID: %lu)\n", (unsigned long)act->thread_id);
+//     return 0;
+// }
+
+// // 重新创建线程
+// int actuator_recreate(struct actuator *act, void *(*new_thread_func)(void *), void *new_arg)
+// {
+//     if (act == NULL || new_thread_func == NULL) {
+//         fprintf(stderr, "Invalid arguments for actuator_recreate\n");
+//         return -1;
+//     }
+    
+//     // 首先杀死现有线程
+//     if (act->is_running) {
+//         printf("Killing existing thread before recreation...\n");
+//         actuator_kill(act);
+//     }
+ 
+//     // 设置新的线程参数
+//     act->production_func = new_thread_func;
+//     act->thread_arg = new_arg;
+//     act->is_running = true;
+    
+//     // 创建新线程
+//     int ret = pthread_create(&act->thread_id, NULL, thread_wrapper, act);
+//     if (ret != 0) {
+//         fprintf(stderr, "Failed to recreate thread: %d\n", ret);
+//         return -1;
+//     }
+    
+//     printf("Thread recreated successfully (ID: %lu)\n", (unsigned long)act->thread_id);
+//     return 0;
+// }
+
+// /*重启线程*/
+// int actuator_restart(struct actuator *act)
+// {
+//     actuator_kill(act);
+//     actuator_recreate(act, act->production_func, act->thread_arg);
+//     return 0;
+// }

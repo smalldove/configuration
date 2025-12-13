@@ -2,6 +2,7 @@
 #include "func_registry.h"
 #include "list.h"
 #include "list_cfg_loading.h"
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h> // 用于strcasecmp
@@ -40,23 +41,23 @@ static int cfg_string_compare(const void *a, const void *b)
 }
 
 // 注册配置节点到平衡树
-void register_cfg_node(const char *cfg_id, struct my_node *node)
+int register_cfg_node(const char *cfg_id, struct my_node *node)
 {
     if (cfg_id == NULL || cfg_id[0] == '\0' || node == NULL) {
-        return;
+        return -1;
     }
     
     // 创建树节点
     cfg_tree_node_t *new_node = malloc(sizeof(cfg_tree_node_t));
     if (new_node == NULL) {
-        return;
+        return -2;
     }
     
     // 复制配置ID字符串
     new_node->key = strdup(cfg_id);
     if (new_node->key == NULL) {
         free(new_node);
-        return;
+        return -3;
     }
     
     new_node->node_ptr = node;
@@ -67,20 +68,23 @@ void register_cfg_node(const char *cfg_id, struct my_node *node)
         // 插入失败，清理内存
         free(new_node->key);
         free(new_node);
-        return;
+        return -4;
     }
     
     // 如果键已存在，tsearch会返回现有节点，我们需要释放新节点
     cfg_tree_node_t *existing_node = *(cfg_tree_node_t **)result;
     if (existing_node != new_node) {
-        // 键已存在，释放新节点
+        // 
+        printf("%s 键已存在", new_node->key);
         free(new_node->key);
         free(new_node);
+        return -5;
         // 可以选择更新现有节点的node指针，这里我们保持原样
     } else {
         // 新节点成功插入
         cfg_node_count++;
     }
+    return 0;
 }
 
 // 根据配置ID查找节点
@@ -177,6 +181,12 @@ void cleanup_cfg_registry(void)
                 }
                 free(self);
             }
+            struct list_head *pos, *n;
+            list_for_each_safe(pos, n, &node->node_ptr->out_list_table.list)
+            {
+                list_del(pos);
+                free(pos);
+            }
             free(node->node_ptr);
         }
         
@@ -260,14 +270,14 @@ int parse_flow_yaml(const char *filename, void *user_data)
 }
 
 // 示例回调函数 - 用于演示如何访问解析的数据
-void example_block_callback(const char *id, const char *type, const char *func, 
+void example_block_callback(const char *func, 
                            char **list_array, int list_count,
                            struct _temp_out_info_list *outputs_array, int outputs_count,
-                           void *user_data, struct my_node *node)
+                           void *user_data, struct my_node *self)
 {
     printf("Block found:\n");
-    printf("  ID: %s\n", id);
-    printf("  Type: %s\n", type);
+    printf("  ID: %s\n", self->id_name);
+    printf("  Type: %d\n", self->type);
     if (func && func[0] != '\0') {
         printf("  Function: %s\n", func);
     }
@@ -278,85 +288,43 @@ void example_block_callback(const char *id, const char *type, const char *func,
         // 这里可以进一步解析 outputs 数组的内容
     }
 
-    if (node == NULL) {
-        fprintf(stderr, "Error: Failed to allocate memory for node\n");
-        return;
-    }
 
-    struct my_node *temp_node = NULL;
+    /*串行链路链接*/
     for(int i = 0; i < list_count && i < LIST_MAX; i++)
     {
-        temp_node = find_node_by_cfg_id(list_array[i]);
-        if(temp_node)
-        {
-            node->next_table[i].next = &temp_node->link;
-            node->next_table[i].prev = node->next_table[i].next;
-
-        }
-        else 
-        {
-            printf("没找到:%s", list_array[i]);
-            node->next_table[i].next = NULL;
-            node->next_table[i].prev = node->next_table[i].next;
-        }
-        node->next[i].next = node->next_table[i].next;
-        node->next[i].prev = node->next_table[i].next;
-
+        self->next[i] = find_node_by_cfg_id(list_array[i]); 
     }
-    
 
+
+    /*输出链路链接*/
+    struct out_list_t *tmp_out_node = NULL;
+
+    INIT_LIST_HEAD(&self->out_list.list);
+    INIT_LIST_HEAD(&self->out_list_table.list);
     for(int i = 0; i < outputs_count && i < LIST_MAX; i++)
     {
-        
-        for (int j = 0; j < outputs_array[i].num; j++) {
-            temp_node = find_node_by_cfg_id(outputs_array[i].out_list[j]);
-            
-            if(temp_node)
-            {
-                node->out_list_table[i].out_list.next = &temp_node->link;
-                node->out_list_table[i].out_list.prev = node->next_table[i].next;
-            }
-            else 
-            {
-                node->out_list_table[i].out_list.next = NULL;
-                node->out_list_table[i].out_list.prev = node->next_table[i].next;
-            }
-            
-            node->out_list[i].out_list.next = node->next_table[i].next;
-            node->out_list[i].out_list.prev = node->next_table[i].next;
-
-            node->out_list[i].arg_n = outputs_array[i].arg_out[j];
-        }
-    
+        tmp_out_node = calloc(sizeof(struct out_list_t), 1);
+        tmp_out_node->data.node = find_node_by_cfg_id(outputs_array->out_list[i]);
+        tmp_out_node->data.arg_in = outputs_array->arg_in[i];
+        tmp_out_node->data.arg_out = outputs_array->arg_out[i];
+        list_add_tail(&tmp_out_node->list, &self->out_list.list);
+        list_add_tail(&tmp_out_node->list, &self->out_list_table.list);
     }
 
-    // 基于入参信息填充 node 的属性
-    // 1. 设置 id_name
-    if (id != NULL) {
-        strncpy(node->id_name, id, sizeof(node->id_name) - 1);
-        node->id_name[sizeof(node->id_name) - 1] = '\0';
-    } else {
-        node->id_name[0] = '\0';
-    }
     // 这里可以根据 func 参数设置具体的函数指针，目前先初始化为默认值
     REG_MODE_FUNC_T reg_node_func = find_function_by_id(func);
-    node->self = reg_node_func();
-
-    // 用 id 作为 key，node 的值即实例的地址作为 value，存入平衡树中
-    register_cfg_node(id, node);
+    self->self = reg_node_func();
     
-    printf("  Node registered to global tree with ID: %s\n", id);
+    printf("  Node registered to global tree with ID: %s\n", self->id_name);
     printf("\n");
 }
 
 // 预设调用变量的示例函数
 void parse_flow_yaml_example(void)
 {
-    printf("=== 开始解析 flow.yaml ===\n");
-    
-    // 预设调用变量
+    printf("=== 开始解析链路配置 ===\n");
     const char *filename = "/home/xcvbnm/configuration/src/flow.json";
-    void *user_data = NULL;  // 可以传递任意用户数据
+    void *user_data = cfg_tree_root;  // 可以传递任意用户数据
     
     // 调用解析函数
     int result = parse_flow_yaml(filename, user_data);
@@ -459,6 +427,8 @@ static int parse_json_file(const char *filename, void *user_data)
     cJSON *block_item = NULL;
     
       // 遍历所有blocks
+
+      /*先创建实例并注册到树中无其他操作*/
     cJSON_ArrayForEach(block_item, blocks) {
         if (!cJSON_IsObject(block_item)) {
             fprintf(stderr, "Warning: Block item is not an object, skipping\n");
@@ -468,9 +438,8 @@ static int parse_json_file(const char *filename, void *user_data)
         // 解析block中的字段
         cJSON *id_item = cJSON_GetObjectItemCaseSensitive(block_item, "id");
         cJSON *type_item = cJSON_GetObjectItemCaseSensitive(block_item, "type");
-        cJSON *func_item = cJSON_GetObjectItemCaseSensitive(block_item, "func");
 
-        if(NULL == id_item && NULL == type_item && NULL == func_item )
+        if(NULL == id_item && NULL == type_item )
         {
             continue;
         }
@@ -485,7 +454,7 @@ static int parse_json_file(const char *filename, void *user_data)
 
     }
     
-    // 遍历所有blocks
+    // 链接实例 保护链路与数据链路
     cJSON_ArrayForEach(block_item, blocks) {
         if (!cJSON_IsObject(block_item)) {
             fprintf(stderr, "Warning: Block item is not an object, skipping\n");
@@ -507,9 +476,13 @@ static int parse_json_file(const char *filename, void *user_data)
         }
         
         const char *id = id_item->valuestring;
-        const char *type = type_item->valuestring;
         const char *func = (func_item != NULL && cJSON_IsString(func_item)) ? func_item->valuestring : "";
-        
+        struct my_node *tmp = find_node_by_cfg_id(id);
+        if(NULL == tmp)
+        {
+            fprintf(stderr, "err no find the node : %s", id);
+            continue;
+        }
         // 解析list数组
         char **list_array = NULL;
         int list_count = 0, lists_count = 0;
@@ -517,7 +490,7 @@ static int parse_json_file(const char *filename, void *user_data)
         if (list_item != NULL && cJSON_IsArray(list_item)) {
             list_count = cJSON_GetArraySize(list_item);
             if (list_count > 0) {
-                list_array = calloc(sizeof(char *) , list_count);
+                list_array = calloc(sizeof(char *) , (size_t)list_count);
                 if (list_array != NULL) {
                     int i = 0;
                     cJSON *list_elem = NULL;
@@ -539,25 +512,26 @@ static int parse_json_file(const char *filename, void *user_data)
         // 解析outputs数组
         struct _temp_out_info_list *outputs_array = NULL;
         int outputs_count = 0;
-        struct my_node *tmp = NULL;
+       
         
         if (outputs_item != NULL && cJSON_IsArray(outputs_item)) {
             outputs_count = cJSON_GetArraySize(outputs_item);
             if (outputs_count > 0) {
-                outputs_array = calloc(sizeof(struct _temp_out_info_list) , outputs_count);
+                outputs_array = calloc(sizeof(struct _temp_out_info_list) , (size_t)outputs_count);
                 if (outputs_array != NULL) {
                     cJSON *output_elem = NULL;
                     cJSON *output_elems = NULL;
-                    int i = 0, j = 0, elem_num = 0;
+                    int i = 0, j = 0;
 
                     cJSON_ArrayForEach(output_elem, outputs_item) {
+
                         if (i >= outputs_count) break;
+
                         j = 0;
                         lists_count = cJSON_GetArraySize(output_elem);
-                        outputs_array[i].num = lists_count;
-                        elem_num = cJSON_GetArraySize(output_elem);
-                        if(elem_num == 3)
+                        if(lists_count == 3)
                         {
+                            outputs_array[i].num = lists_count;
                             cJSON_ArrayForEach(output_elems, output_elem) 
                             {
                                 switch (j) {
@@ -592,7 +566,7 @@ static int parse_json_file(const char *filename, void *user_data)
         }
         
         // 调用回调函数
-        example_block_callback(id, type, func, list_array, list_count, outputs_array, outputs_count, user_data, find_node_by_cfg_id(id));
+        example_block_callback( func, list_array, list_count, outputs_array, outputs_count, user_data, tmp);
         block_count++;
         
         // 清理当前block分配的内存

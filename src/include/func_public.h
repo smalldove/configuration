@@ -4,7 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <stdatomic.h>
 #include "list.h"
+#include "ck_queue.h"
+
 enum Node_type
 {
     NODE_START = 0,
@@ -54,25 +58,36 @@ struct func_attribute
 #define NODE_ID 64
 #define LIST_MAX 64
 
-struct out_list
+struct out_my_node_list
 {
-    struct list_head out_list;      // 对方链表地址
-    int arg_n;                      // 对方输出指向
+    struct list_head next;     
+    struct my_node *node;       // 对方节点地址
+    int arg_out;                // 模块输出指向 
+    int arg_in;                 // 对方输入指向
+};
+
+struct out_list_t
+{
+    list_t list;    
+    struct out_my_node_list data;
 };
 
 struct my_node {
 
     char id_name[NODE_ID];                   // 实例名称
+    atomic_int state;            // 0:无执行 1:待执行 2:执行中
     
     enum Node_type type;
-
+    CK_LIST_ENTRY(my_node) queue;
     struct list_head link;          // 本节点引用点
-    struct list_head next[LIST_MAX];          // 链路的指向调用表
+
+    struct my_node *next[LIST_MAX];          // 链路的指向调用表
     /*默认限制是最大32个并发链路，可拓展，默认初始化时next与next_table保持一致*/
-    struct list_head next_table[LIST_MAX];    // 链路的指向实例总表
+    // 链路中有指针为空值时，遍历结束
+    struct my_node *next_table[LIST_MAX];    // 链路的指向实例总表
     
-    struct out_list out_list[LIST_MAX];          // 输出指向的调用表
-    struct out_list out_list_table[LIST_MAX];    // 输出指向的实例总表
+    struct out_list_t out_list;          // 输出指向的调用表
+    struct out_list_t out_list_table;    // 输出指向的实例总表
     
     struct func_attribute *self;
 };
