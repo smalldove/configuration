@@ -60,7 +60,6 @@ struct func_attribute
 
 struct out_my_node_list
 {
-    struct list_head next;     
     struct my_node *node;       // 对方节点地址
     int arg_out;                // 模块输出指向 
     int arg_in;                 // 对方输入指向

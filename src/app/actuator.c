@@ -156,15 +156,17 @@ void *actuator_execution(void *arg)
             list_for_each_safe(pos, n, &self_node->out_list.list)
             {
                 out_item = list_entry(pos, struct out_list_t, list);
-
-                // list_for_each_safe(pos_s, n_s, &out_item->data.next)
-                // {
-
-                //     // 参数传递
-                //     out_item_data = list_entry(pos_s, struct out_my_node_list, next);
-                //     out_item_data->node->self->in_attribute(out_item_data->node, self_node->self->out_attribute(self_node, out_item_data->arg_in), out_item_data->arg_in);
-                // }
-
+                if(out_item->data.node && out_item->data.node->self && out_item->data.node->self->in_attribute)
+                {
+                    // 参数传递
+                    out_item->data.node->self->in_attribute(out_item->data.node, self_node->self->out_attribute(self_node, out_item->data.arg_out), out_item->data.arg_in);
+                }
+            }
+            if(self_node->link.next)
+            {
+                // 取出self_node->link的地址,若不为空 将下一个地址 赋予队列product_arg->production_head
+                struct my_node *next_node = list_entry(self_node->link.next, struct my_node, link);
+                CK_LIST_INSERT_HEAD(&product_arg->production_head, next_node, queue);
             }
 
             atomic_store(&tmp->exec, NULL); // 清空执行指针
