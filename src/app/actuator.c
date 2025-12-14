@@ -1,3 +1,4 @@
+#include "ck_queue.h"
 #include "list.h"
 #define _POSIX_C_SOURCE 200809L
 #include "actuator.h"
@@ -11,7 +12,7 @@
 #include <string.h>
 
 // 初始化执行器模块
-struct actuator_thread_t *actuator_ini(int production_num, void *(*production_unit)(void *), void *production_arg, int execution_num, void *(*execution_unit)(void *), void *execution_arg)
+struct actuator_thread_t *actuator_ini(int production_num, void *(*production_unit)(void *), int execution_num, void *(*execution_unit)(void *), void *arg)
 {
     struct actuator_thread_t *act = calloc(sizeof(struct actuator_thread_t), 1);
 
@@ -23,11 +24,9 @@ struct actuator_thread_t *actuator_ini(int production_num, void *(*production_un
 
     act->production_num = production_num;
     act->production_unit = production_unit;
-    act->production_arg = production_arg;
     act->execution_num = execution_num;
     act->execution_unit = execution_unit;
-    act->execution_arg = execution_arg;
-    act->exec_cnt = false;
+    act->arg = arg;
     
     return act;
 }
@@ -40,20 +39,35 @@ int actuator_create(struct actuator_thread_t *act)
         return -1;
     }
 
+    
+    struct CK_HEAD_t *ck_queue = calloc(sizeof(struct CK_HEAD_t), 1);
+    CK_STAILQ_INIT(&ck_queue->production_head);
+    CK_STAILQ_INIT(&ck_queue->execution_head);
+
     for (int i = 0; i < act->production_num; i++)
     {
         act->production_id[i] = 0;
-        int ret = pthread_create(&act->production_id[i], NULL, act->production_unit, act->production_arg);
+        struct actuator_pro_arg_t *arg = calloc(sizeof(struct actuator_pro_arg_t ), 1);
+        arg->cnt = i;
+        arg->arg = arg->arg;
+        arg->ck_queue = ck_queue;
+
+        int ret = pthread_create(&act->production_id[i], NULL, act->production_unit, arg);
         if (ret != 0) {
             fprintf(stderr, "Failed to create production thread %d: %d\n", i, ret);
             return -1;
         }
     }
-
     for (int i = 0; i < act->execution_num; i++)
     {
         act->execution_id[i] = 0;
-        int ret = pthread_create(&act->execution_id[i], NULL, act->execution_unit, act->execution_arg);
+        struct actuator_exec_arg_t *arg = calloc(sizeof(struct actuator_exec_arg_t), 1);
+        arg->cnt = i;
+        arg->arg = arg->arg;
+        arg->ck_queue = ck_queue;
+
+        int ret = pthread_create(&act->execution_id[i], NULL, act->execution_unit, act->arg);
+        
         if (ret != 0) {
             fprintf(stderr, "Failed to create execution thread %d: %d\n", i, ret);
             return -1;
@@ -77,14 +91,11 @@ void *actuator_production(void *arg)
     
     struct my_node *queues = NULL;
     struct exec_buf *tmp = NULL;
-    struct actuator_thread_t *act_arg = arg;
-    
-    
-    struct actuator_pro_arg_t *product_arg = act_arg->production_arg;       // 数据缓冲区
-    struct actuator_exec_arg_t *execution_arg = act_arg->execution_arg;     // 可执行单元队列
-    
-    CK_LIST_INIT(&product_arg->production_head);
+    struct actuator_pro_arg_t *act_arg = arg;
+    struct CK_HEAD_t *ck_queue = act_arg->ck_queue;
 
+	struct exec_buf *execu_n, execu_a, execu_b;        /* n: 动态分配节点指针, a,b: 静态测试节点 */
+	struct my_node *pro_n, pro_a, pro_b;        /* n: 动态分配节点指针, a,b: 静态测试节点 */
 
     while (1) {
         /*线程优化*/
@@ -95,16 +106,16 @@ void *actuator_production(void *arg)
         */
 
         // 检查队列是否为空
-        if (!CK_LIST_EMPTY(&product_arg->production_head)) {
-            if(!CK_LIST_EMPTY(&execution_arg->execution_head))
+        if (!CK_STAILQ_EMPTY(&ck_queue->production_head)) {
+            if(!CK_STAILQ_EMPTY(&ck_queue->execution_head))
             {
-                tmp = CK_LIST_FIRST(&execution_arg->execution_head);
-                CK_LIST_REMOVE(queues, queue);
+                tmp = CK_STAILQ_FIRST(&ck_queue->execution_head);
+                CK_STAILQ_REMOVE(&ck_queue->execution_head, execu_n, exec_buf, queue);
             }
             // 获取队首元素
-            queues = CK_LIST_FIRST(&product_arg->production_head);
+            queues = CK_STAILQ_FIRST(&ck_queue->production_head);
             // 从队列中移除队首元素
-            CK_LIST_REMOVE(queues, queue);
+            CK_STAILQ_REMOVE(&ck_queue->production_head, pro_n, my_node, queue);
             atomic_exchange(&tmp->exec, queues);    // 原子写入
         }
     }
@@ -120,12 +131,10 @@ void *actuator_execution(void *arg)
         return NULL;
     }
 
-    struct actuator_thread_t *act_arg = arg;
-    
-    struct actuator_pro_arg_t *product_arg = act_arg->production_arg;
-    struct actuator_exec_arg_t *execution_arg = act_arg->execution_arg;
-    struct my_node *self_node = execution_arg->buffer[act_arg->exec_cnt % 32].exec;
-    struct exec_buf *tmp = &execution_arg->buffer[act_arg->exec_cnt % 32];
+    struct actuator_exec_arg_t *act_arg = arg;
+    struct my_node *self_node = NULL;
+    struct exec_buf *tmp = calloc(sizeof(struct exec_buf), 1);
+    struct CK_HEAD_t *ck_queue = act_arg->ck_queue;
     
     struct list_head *pos, *n, *pos_s, *n_s;
     struct out_list_t *out_item;
@@ -133,8 +142,10 @@ void *actuator_execution(void *arg)
     while (1) {
 
         /*线程优化*/
+
         sched_yield();
         pthread_testcancel();
+
         // 正确：使用原子存储
         // atomic_store(&tmp->exec, queue);
 
@@ -143,6 +154,7 @@ void *actuator_execution(void *arg)
 
         // // 正确：原子交换
         // struct my_node *old = atomic_exchange(&tmp->exec, new_ptr);
+        
         self_node = atomic_load(&tmp->exec);
         if(self_node)
         {
@@ -166,7 +178,7 @@ void *actuator_execution(void *arg)
             {
                 // 取出self_node->link的地址,若不为空 将下一个地址 赋予队列product_arg->production_head
                 struct my_node *next_node = list_entry(self_node->link.next, struct my_node, link);
-                CK_LIST_INSERT_HEAD(&product_arg->production_head, next_node, queue);
+                CK_STAILQ_INSERT_TAIL(&ck_queue->production_head, next_node, queue);
             }
 
             atomic_store(&tmp->exec, NULL); // 清空执行指针

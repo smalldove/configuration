@@ -270,7 +270,7 @@ int parse_flow_yaml(const char *filename, void *user_data)
 }
 
 // 示例回调函数 - 用于演示如何访问解析的数据
-void example_block_callback(const char *func, 
+int example_block_callback(const char *func, 
                            char **list_array, int list_count,
                            struct _temp_out_info_list *outputs_array, int outputs_count,
                            void *user_data, struct my_node *self)
@@ -282,12 +282,12 @@ void example_block_callback(const char *func,
         printf("  Function: %s\n", func);
     }
 
-    
-    if (outputs_count > 0) {
-        printf("  Outputs: %d\n", outputs_count);
-        // 这里可以进一步解析 outputs 数组的内容
-    }
-
+        // 这里可以根据 func 参数设置具体的函数指针，目前先初始化为默认值
+    REG_MODE_FUNC_T reg_node_func = find_function_by_id(func);
+    if(reg_node_func)
+        self->self = reg_node_func();
+    else
+        return -1;
 
     /*串行链路链接*/
     for(int i = 0; i < list_count && i < LIST_MAX; i++)
@@ -311,12 +311,11 @@ void example_block_callback(const char *func,
         list_add_tail(&tmp_out_node->list, &self->out_list_table.list);
     }
 
-    // 这里可以根据 func 参数设置具体的函数指针，目前先初始化为默认值
-    REG_MODE_FUNC_T reg_node_func = find_function_by_id(func);
-    self->self = reg_node_func();
+
     
     printf("  Node registered to global tree with ID: %s\n", self->id_name);
     printf("\n");
+    return 0;
 }
 
 // 预设调用变量的示例函数
@@ -345,21 +344,21 @@ enum Node_type get_type(const char *type)
     enum Node_type ret = NODE_NON;
     if(strcmp(type, "start"))
     {
-        ret = NODE_FANSHAPED;
+        ret = NODE_START;
     }
-    else if(strcmp(type, "start"))
+    else if(strcmp(type, "relay"))
     {
         ret = NODE_RELAY;
     }
-    else if(strcmp(type, "start"))
+    else if(strcmp(type, "switch"))
     {
         ret = NODE_SWITCH;
     }
-    else if(strcmp(type, "start"))
+    else if(strcmp(type, "fanshaped"))
     {
-        ret = NODE_START;
+        ret = NODE_FANSHAPED;
     }
-    else if(strcmp(type, "start"))
+    else if(strcmp(type, "end"))
     {
         ret = NODE_END;
     }
@@ -566,7 +565,49 @@ static int parse_json_file(const char *filename, void *user_data)
         }
         
         // 调用回调函数
-        example_block_callback( func, list_array, list_count, outputs_array, outputs_count, user_data, tmp);
+        if(example_block_callback( func, list_array, list_count, outputs_array, outputs_count, user_data, tmp))
+        {
+            fprintf(stderr, "nofind:%s\n", func);
+            // 从树中删除tmp对应的节点
+            cfg_tree_node_t search_key;
+            search_key.key = tmp->id_name;
+            search_key.node_ptr = NULL;
+            
+            // 查找对应的树节点
+            void *found = tfind(&search_key, &cfg_tree_root, cfg_string_compare);
+            if (found != NULL) {
+                cfg_tree_node_t *tree_node = *(cfg_tree_node_t **)found;
+                
+                // 从树中删除节点
+                tdelete(&search_key, &cfg_tree_root, cfg_string_compare);
+                
+                // 释放树节点内存
+                free(tree_node->key);
+                free(tree_node);
+                cfg_node_count--;
+            }
+            
+            // 释放tmp节点内存
+            if (tmp->self != NULL) {
+                if (tmp->self->arg != NULL) {
+                    free(tmp->self->arg);
+                }
+                free(tmp->self);
+            }
+            
+            // 释放输出链表节点（如果列表已初始化）
+            // 检查列表是否可能已被初始化（next不为NULL或列表不为空）
+            if (tmp->out_list_table.list.next != NULL) {
+                struct list_head *pos, *n;
+                list_for_each_safe(pos, n, &tmp->out_list_table.list)
+                {
+                    list_del(pos);
+                    free(pos);
+                }
+            }
+            
+            free(tmp);
+        }
         block_count++;
         
         // 清理当前block分配的内存

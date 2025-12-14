@@ -77,7 +77,7 @@ struct my_node {
     atomic_int state;            // 0:无执行 1:待执行 2:执行中
     
     enum Node_type type;
-    CK_LIST_ENTRY(my_node) queue;
+    CK_STAILQ_ENTRY(my_node) queue;
     struct list_head link;          // 本节点引用点
 
     struct my_node *next[LIST_MAX];          // 链路的指向调用表

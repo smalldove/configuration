@@ -11,7 +11,7 @@
     },
     {
       "id": "relay1",
-      "func": "mode_1",
+      "func": "mode_2",
       "type": "relay",
       "list": ["relay2"],
       "outputs": 
@@ -24,7 +24,7 @@
     },
     {
       "id": "relay2",
-      "func": "mode_2",
+      "func": "mode_3",
       "type": "branch",
       "list": ["relay3", "relay4"],
       "outputs": [

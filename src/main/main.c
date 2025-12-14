@@ -106,6 +106,9 @@ int main(void)
     // 
     parse_flow_yaml_example();
     demo_cfg_node_registry();
+
+    // struct actuator_thread_t *actuator = actuator_ini(3, actuator_production, );
+    // actuator_create();
     
     // 程序退出前清理平衡树
     cleanup_func_registry();
