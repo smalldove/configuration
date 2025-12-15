@@ -58,17 +58,14 @@ struct func_attribute
 #define NODE_ID 64
 #define LIST_MAX 64
 
-struct out_my_node_list
-{
-    struct my_node *node;       // 对方节点地址
-    int arg_out;                // 模块输出指向 
-    int arg_in;                 // 对方输入指向
-};
 
 struct out_list_t
 {
-    list_t list;    
-    struct out_my_node_list data;
+    struct my_node *node[LIST_MAX];         // 对方节点地址
+    int arg_out[LIST_MAX];                  // 模块输出指向 
+    int arg_in[LIST_MAX];                   // 对方输入指向
+    int num;                                // 有效数
+
 };
 
 struct my_node {
@@ -84,9 +81,9 @@ struct my_node {
     /*默认限制是最大32个并发链路，可拓展，默认初始化时next与next_table保持一致*/
     // 链路中有指针为空值时，遍历结束
     struct my_node *next_table[LIST_MAX];    // 链路的指向实例总表
-    
-    struct out_list_t out_list;          // 输出指向的调用表
-    struct out_list_t out_list_table;    // 输出指向的实例总表
+
+    struct out_list_t *out_list;       // 对方节点地址
+    struct out_list_t *out_list_table;       // 对方节点地址
     
     struct func_attribute *self;
 };

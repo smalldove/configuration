@@ -1,5 +1,6 @@
 #include "func_public.h"
 #include "func_registry.h"
+#include <stdio.h>
 /*
 
 input:
@@ -14,7 +15,7 @@ arg: int
 
 static int func_3_in(struct my_node *self, void *arg, int arg_n)
 {
-    printf("参数:%d, 地址:%p", arg_n, arg);
+    printf("func_3_in 执行\n");
     return 0;
     switch (arg_n) { 
         case 0: 
@@ -30,20 +31,21 @@ static int func_3_in(struct my_node *self, void *arg, int arg_n)
 
 static int func_3(struct my_node *self)
 {
+    printf("func_3 执行\n");
     if(NULL == self || NULL == self->self->arg)
     {
         return 0;
     }
-    
+    printf("id: %s, mode 3执行\n", self->id_name);
     // 重置路径
-    self->next[0] = self->next_table[((int*)self->self->arg)[0] > ((int*)self->self->arg)[1] ? 0 : 1];
+    // self->next[0] = self->next_table[((int*)self->self->arg)[0] > ((int*)self->self->arg)[1] ? 0 : 1];
 
     return 0;
 }
 
 static void *func_3_out(struct my_node *self, int arg_n)
 {
-    printf("输出%d", arg_n);
+    printf("func_3_out 执行\n");
     return NULL;
     switch (arg_n) { 
         case 0: 

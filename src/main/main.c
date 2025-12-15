@@ -2,6 +2,7 @@
 #include "func_registry.h"
 #include "list_cfg_loading.h"
 #include "actuator.h"
+#include <unistd.h>
 
 // 用于显示函数的回调函数
 static void print_func_info(REG_MODE_FUNC_T func, void *arg)
@@ -107,9 +108,12 @@ int main(void)
     parse_flow_yaml_example();
     demo_cfg_node_registry();
 
-    // struct actuator_thread_t *actuator = actuator_ini(3, actuator_production, );
-    // actuator_create();
+    struct actuator_thread_t *actuator = actuator_ini(1, actuator_production, 1, actuator_execution, NULL);
+    actuator_create(actuator);
+    while (1) {
+        sleep(1);
     
+    }    
     // 程序退出前清理平衡树
     cleanup_func_registry();
     cleanup_cfg_registry();

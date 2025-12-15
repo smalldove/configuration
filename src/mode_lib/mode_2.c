@@ -1,6 +1,7 @@
 #include "func_public.h"
 #include "func_registry.h"
 #include <stdatomic.h>
+#include <stdio.h>
 /*
 
 input:
@@ -15,7 +16,7 @@ arg: int
 
 static int func_2_in(struct my_node *self, void *arg, int arg_n)
 {
-    printf("参数:%d, 地址:%p", arg_n, arg);
+    printf("func_2_in 执行\n");
     return 0;
     if(NULL == arg)
     {
@@ -35,6 +36,8 @@ static int func_2_in(struct my_node *self, void *arg, int arg_n)
 
 static int func_2(struct my_node *self)
 {
+    printf("func_2 执行\n");
+    return 0;
     if(NULL == self || NULL == self->self->arg)
     {
         return 0;
@@ -48,7 +51,7 @@ static int func_2(struct my_node *self)
 
 static void *func_2_out(struct my_node *self, int arg_n)
 {    
-    printf("输出%d", arg_n);
+    printf("func_2_out 执行\n");
     return NULL;
     
     switch (arg_n) { 

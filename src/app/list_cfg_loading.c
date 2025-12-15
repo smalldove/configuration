@@ -21,9 +21,9 @@ typedef struct cfg_tree_node {
 
 struct _temp_out_info_list
 {
-    int arg_out[LIST_MAX];
-    char *out_list[LIST_MAX];
-    int arg_in[LIST_MAX];
+    int arg_out;
+    char *out_list;
+    int arg_in;
     int num;
 };
 
@@ -181,12 +181,13 @@ void cleanup_cfg_registry(void)
                 }
                 free(self);
             }
-            struct list_head *pos, *n;
-            list_for_each_safe(pos, n, &node->node_ptr->out_list_table.list)
-            {
-                list_del(pos);
-                free(pos);
-            }
+            
+            if(node->node_ptr->out_list_table)
+                free(node->node_ptr->out_list_table);
+
+            if(node->node_ptr->out_list)
+                free(node->node_ptr->out_list);
+
             free(node->node_ptr);
         }
         
@@ -293,23 +294,28 @@ int example_block_callback(const char *func,
     for(int i = 0; i < list_count && i < LIST_MAX; i++)
     {
         self->next[i] = find_node_by_cfg_id(list_array[i]); 
+        self->next_table[i] = find_node_by_cfg_id(list_array[i]); 
     }
 
 
     /*输出链路链接*/
-    struct out_list_t *tmp_out_node = NULL;
+    self->out_list = calloc(sizeof(struct out_list_t), 1);
+    self->out_list_table = calloc(sizeof(struct out_list_t), 1);
 
-    INIT_LIST_HEAD(&self->out_list.list);
-    INIT_LIST_HEAD(&self->out_list_table.list);
     for(int i = 0; i < outputs_count && i < LIST_MAX; i++)
-    {
-        tmp_out_node = calloc(sizeof(struct out_list_t), 1);
-        tmp_out_node->data.node = find_node_by_cfg_id(outputs_array->out_list[i]);
-        tmp_out_node->data.arg_in = outputs_array->arg_in[i];
-        tmp_out_node->data.arg_out = outputs_array->arg_out[i];
-        list_add_tail(&tmp_out_node->list, &self->out_list.list);
-        list_add_tail(&tmp_out_node->list, &self->out_list_table.list);
+    {        
+        self->out_list->node[i] = find_node_by_cfg_id(outputs_array[i].out_list);
+        self->out_list->arg_in[i] = outputs_array[i].arg_in;
+        self->out_list->arg_out[i] = outputs_array[i].arg_out;
+
+        self->out_list_table->node[i] = find_node_by_cfg_id(outputs_array[i].out_list);
+        self->out_list_table->arg_in[i] = outputs_array[i].arg_in;
+        self->out_list_table->arg_out[i] = outputs_array[i].arg_out;
+
     }
+    
+    self->out_list->num = outputs_count >= LIST_MAX ? LIST_MAX : outputs_count;
+    self->out_list_table->num = outputs_count >= LIST_MAX ? LIST_MAX : outputs_count;
 
 
     
@@ -342,23 +348,23 @@ void parse_flow_yaml_example(void)
 enum Node_type get_type(const char *type)
 {
     enum Node_type ret = NODE_NON;
-    if(strcmp(type, "start"))
+    if(strcmp(type, "start") == 0)
     {
         ret = NODE_START;
     }
-    else if(strcmp(type, "relay"))
+    else if(strcmp(type, "relay") == 0)
     {
         ret = NODE_RELAY;
     }
-    else if(strcmp(type, "switch"))
+    else if(strcmp(type, "branch") == 0)
     {
         ret = NODE_SWITCH;
     }
-    else if(strcmp(type, "fanshaped"))
+    else if(strcmp(type, "fanshaped") == 0)
     {
         ret = NODE_FANSHAPED;
     }
-    else if(strcmp(type, "end"))
+    else if(strcmp(type, "end") == 0)
     {
         ret = NODE_END;
     }
@@ -531,21 +537,22 @@ static int parse_json_file(const char *filename, void *user_data)
                         if(lists_count == 3)
                         {
                             outputs_array[i].num = lists_count;
+                            int k = 0;
                             cJSON_ArrayForEach(output_elems, output_elem) 
                             {
-                                switch (j) {
+                                switch (k++) {
                                     case 0:
-                                        outputs_array[i].arg_out[j] = output_elem->valueint;
+                                        outputs_array[i].arg_out = output_elems->valueint;
 
                                     break;
 
                                     case 1:
-                                        outputs_array[i].out_list[j] = output_elem->valuestring;
+                                        outputs_array[i].out_list = output_elems->valuestring;
 
                                     break;
 
                                     case 2:
-                                        outputs_array[i].arg_in[j] = output_elem->valueint;
+                                        outputs_array[i].arg_in = output_elems->valueint;
                                     break;
                                 
                                 }
@@ -597,13 +604,14 @@ static int parse_json_file(const char *filename, void *user_data)
             
             // 释放输出链表节点（如果列表已初始化）
             // 检查列表是否可能已被初始化（next不为NULL或列表不为空）
-            if (tmp->out_list_table.list.next != NULL) {
-                struct list_head *pos, *n;
-                list_for_each_safe(pos, n, &tmp->out_list_table.list)
-                {
-                    list_del(pos);
-                    free(pos);
-                }
+            if (tmp->out_list) 
+            {
+                free(tmp->out_list);
+            }
+            
+            if (tmp->out_list_table) 
+            {
+                free(tmp->out_list_table);
             }
             
             free(tmp);

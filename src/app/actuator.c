@@ -6,17 +6,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
-#include <time.h>
 #include <signal.h>
 #include <string.h>
-
+#include "list_cfg_loading.h"
 // 初始化执行器模块
 struct actuator_thread_t *actuator_ini(int production_num, void *(*production_unit)(void *), int execution_num, void *(*execution_unit)(void *), void *arg)
 {
     struct actuator_thread_t *act = calloc(sizeof(struct actuator_thread_t), 1);
 
-    if(act)
+    if(NULL == act)
     {
         return NULL;
     }
@@ -49,7 +47,7 @@ int actuator_create(struct actuator_thread_t *act)
         act->production_id[i] = 0;
         struct actuator_pro_arg_t *arg = calloc(sizeof(struct actuator_pro_arg_t ), 1);
         arg->cnt = i;
-        arg->arg = arg->arg;
+        arg->arg = act->arg;
         arg->ck_queue = ck_queue;
 
         int ret = pthread_create(&act->production_id[i], NULL, act->production_unit, arg);
@@ -63,10 +61,10 @@ int actuator_create(struct actuator_thread_t *act)
         act->execution_id[i] = 0;
         struct actuator_exec_arg_t *arg = calloc(sizeof(struct actuator_exec_arg_t), 1);
         arg->cnt = i;
-        arg->arg = arg->arg;
+        arg->arg = act->arg;
         arg->ck_queue = ck_queue;
 
-        int ret = pthread_create(&act->execution_id[i], NULL, act->execution_unit, act->arg);
+        int ret = pthread_create(&act->execution_id[i], NULL, act->execution_unit, arg);
         
         if (ret != 0) {
             fprintf(stderr, "Failed to create execution thread %d: %d\n", i, ret);
@@ -77,7 +75,15 @@ int actuator_create(struct actuator_thread_t *act)
     return 0;
 }
 
-
+void get_start(struct my_node *node, void *arg)
+{
+    if(NODE_START == node->type)
+    {
+        struct CK_HEAD_t *ck_queue = arg;
+        CK_STAILQ_INSERT_TAIL(&ck_queue->production_head, node, queue);
+    }
+    return;
+}
 
 /*驱动器-生产分配*/
 void *actuator_production(void *arg)
@@ -94,8 +100,7 @@ void *actuator_production(void *arg)
     struct actuator_pro_arg_t *act_arg = arg;
     struct CK_HEAD_t *ck_queue = act_arg->ck_queue;
 
-	struct exec_buf *execu_n, execu_a, execu_b;        /* n: 动态分配节点指针, a,b: 静态测试节点 */
-	struct my_node *pro_n, pro_a, pro_b;        /* n: 动态分配节点指针, a,b: 静态测试节点 */
+    iterate_all_cfg_nodes(get_start, ck_queue);
 
     while (1) {
         /*线程优化*/
@@ -110,13 +115,18 @@ void *actuator_production(void *arg)
             if(!CK_STAILQ_EMPTY(&ck_queue->execution_head))
             {
                 tmp = CK_STAILQ_FIRST(&ck_queue->execution_head);
-                CK_STAILQ_REMOVE(&ck_queue->execution_head, execu_n, exec_buf, queue);
+                CK_STAILQ_REMOVE(&ck_queue->execution_head, tmp, exec_buf, queue);
+                // 获取队首元素
+                queues = CK_STAILQ_FIRST(&ck_queue->production_head);
+                // 从队列中移除队首元素
+                CK_STAILQ_REMOVE(&ck_queue->production_head, queues, my_node, queue);
+                atomic_exchange(&tmp->exec, queues);    // 原子写入
             }
-            // 获取队首元素
-            queues = CK_STAILQ_FIRST(&ck_queue->production_head);
-            // 从队列中移除队首元素
-            CK_STAILQ_REMOVE(&ck_queue->production_head, pro_n, my_node, queue);
-            atomic_exchange(&tmp->exec, queues);    // 原子写入
+            else 
+            {
+            
+            }
+            
         }
     }
     return NULL;
@@ -139,6 +149,9 @@ void *actuator_execution(void *arg)
     struct list_head *pos, *n, *pos_s, *n_s;
     struct out_list_t *out_item;
     struct out_my_node_list *out_item_data;
+
+    CK_STAILQ_INSERT_TAIL(&ck_queue->execution_head, tmp, queue);
+
     while (1) {
 
         /*线程优化*/
@@ -164,24 +177,28 @@ void *actuator_execution(void *arg)
                 self_node->self->func(self_node);
             }
 
-            // 遍历self_node->out_list
-            list_for_each_safe(pos, n, &self_node->out_list.list)
+            if (self_node->out_list && self_node->out_list->num)
             {
-                out_item = list_entry(pos, struct out_list_t, list);
-                if(out_item->data.node && out_item->data.node->self && out_item->data.node->self->in_attribute)
+                for(int i = 0; i < self_node->out_list->num; i++)
                 {
-                    // 参数传递
-                    out_item->data.node->self->in_attribute(out_item->data.node, self_node->self->out_attribute(self_node, out_item->data.arg_out), out_item->data.arg_in);
+                    self_node->out_list->node[i]->self->in_attribute(self_node->out_list->node[i], self_node->self->out_attribute(self_node, self_node->out_list->arg_out[i]), self_node->out_list->arg_in[i]);
                 }
-            }
-            if(self_node->link.next)
+
+            } 
+            else 
             {
-                // 取出self_node->link的地址,若不为空 将下一个地址 赋予队列product_arg->production_head
-                struct my_node *next_node = list_entry(self_node->link.next, struct my_node, link);
-                CK_STAILQ_INSERT_TAIL(&ck_queue->production_head, next_node, queue);
+                printf("%s无输出链路\n", self_node->id_name);
+            }
+
+            for (int i = 0; i < LIST_MAX; i++) 
+            {
+                if(self_node->next[i] == NULL)
+                    break;
+                CK_STAILQ_INSERT_TAIL(&ck_queue->production_head, self_node->next[i], queue);
             }
 
             atomic_store(&tmp->exec, NULL); // 清空执行指针
+            CK_STAILQ_INSERT_TAIL(&ck_queue->execution_head, tmp, queue);
 
         }
     }
