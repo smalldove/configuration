@@ -3,7 +3,6 @@
     {
       "id": "start1",
       "func": "mode_1",
-      "arg":["{json配置}"],
       "type": "start",
       "list": ["relay1"],
       "outputs": [
@@ -54,7 +53,7 @@
       "id": "start_2",
       "type": "start",
       "func": "sleep_mode",
-      "list": ["branch_1"],
+      "list": ["end_2"],
       "outputs": [
       ]
     },
@@ -62,7 +61,7 @@
       "id": "branch_1",
       "type": "branch",
       "func": "branch_mode",
-      "list": [ "start_2_relay_6", "end_2"],
+      "list": ["end_2", "start_2_relay_6"],
       "outputs": [
       ]
     },

@@ -31,7 +31,7 @@ static int func_3_in(struct my_node *self, void *arg, int arg_n)
 
 static int func_3(struct my_node *self)
 {
-    printf("▲ :id: %s 执行 func_3 执行\n", self->id_name);
+    printf("🔺 :id: %s 执行 func_3 执行\n", self->id_name);
     if(NULL == self || NULL == self->self->arg)
     {
         return 0;

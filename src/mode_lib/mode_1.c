@@ -41,7 +41,7 @@ static int func_1(struct my_node *self)
         return -1;
     }
     *(int*)(self->self->arg) += 2;
-    printf("▲ :id: %s 执行 func_1\n", self->id_name);
+    printf("🔺 :id: %s 执行 func_1\n", self->id_name);
     return 0;
 }
 

@@ -36,7 +36,7 @@ static int func_2_in(struct my_node *self, void *arg, int arg_n)
 
 static int func_2(struct my_node *self)
 {
-    printf("▲ :id: %s 执行 func_2\n", self->id_name);
+    printf("🔺 :id: %s 执行 func_2\n", self->id_name);
     return 0;
     if(NULL == self || NULL == self->self->arg)
     {
@@ -76,6 +76,7 @@ struct func_attribute *init_mode_2(void)
 
     self->out_attribute = func_2_out;
     self->output_num = 1;
+    
 
     return self;
 }

@@ -187,7 +187,7 @@ void *actuator_execution(void *arg)
             } 
             else 
             {
-                printf("%s无输出链路\n", self_node->id_name);
+                // printf("%s无输出链路\n", self_node->id_name);
             }
 
             for (int i = 0; i < LIST_MAX; i++) 
