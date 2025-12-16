@@ -16,7 +16,7 @@ arg: int
 
 static int func_2_in(struct my_node *self, void *arg, int arg_n)
 {
-    printf("func_2_in 执行\n");
+    printf("⭕️:id: %s 执行 func_2_in\n", self->id_name);
     return 0;
     if(NULL == arg)
     {
@@ -36,7 +36,7 @@ static int func_2_in(struct my_node *self, void *arg, int arg_n)
 
 static int func_2(struct my_node *self)
 {
-    printf("func_2 执行\n");
+    printf("▲ :id: %s 执行 func_2\n", self->id_name);
     return 0;
     if(NULL == self || NULL == self->self->arg)
     {
@@ -51,7 +51,7 @@ static int func_2(struct my_node *self)
 
 static void *func_2_out(struct my_node *self, int arg_n)
 {    
-    printf("func_2_out 执行\n");
+    printf("⬛️:id: %s 执行 func_2_out\n", self->id_name);
     return NULL;
     
     switch (arg_n) { 

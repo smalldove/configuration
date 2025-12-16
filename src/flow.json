@@ -33,7 +33,7 @@
     },
     {
       "id": "relay4",
-      "func": "mode_1",
+      "func": "sleep_mode",
       "type": "relay",
       "list": ["relay3"],
       "outputs": [
@@ -43,7 +43,7 @@
     {
       "id": "relay3",
       "type": "end",
-      "func": "mode_1",
+      "func": "sleep_mode",
       "list": [],
       "outputs": [
         [0, "relay3", 0]

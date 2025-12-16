@@ -15,7 +15,7 @@ arg: int
 
 static int func_3_in(struct my_node *self, void *arg, int arg_n)
 {
-    printf("func_3_in 执行\n");
+    printf("⭕️:id: %s 执行 func_3_in\n", self->id_name);
     return 0;
     switch (arg_n) { 
         case 0: 
@@ -31,12 +31,11 @@ static int func_3_in(struct my_node *self, void *arg, int arg_n)
 
 static int func_3(struct my_node *self)
 {
-    printf("func_3 执行\n");
+    printf("▲ :id: %s 执行 func_3 执行\n", self->id_name);
     if(NULL == self || NULL == self->self->arg)
     {
         return 0;
     }
-    printf("id: %s, mode 3执行\n", self->id_name);
     // 重置路径
     // self->next[0] = self->next_table[((int*)self->self->arg)[0] > ((int*)self->self->arg)[1] ? 0 : 1];
 
@@ -45,7 +44,7 @@ static int func_3(struct my_node *self)
 
 static void *func_3_out(struct my_node *self, int arg_n)
 {
-    printf("func_3_out 执行\n");
+    printf("⬛️:id: %s 执行 func_3_out 执行\n", self->id_name);
     return NULL;
     switch (arg_n) { 
         case 0: 
