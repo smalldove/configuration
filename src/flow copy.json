@@ -24,20 +24,27 @@
     },
     {
       "id": "relay2",
-      "func": "mode_3",
+      "func": "sleep_mode",
       "type": "branch",
-      "list": ["relay3", "relay4"],
+      "list": ["relaym", "relays"],
       "outputs": [
         [0, "relay3", 0]
       ]
     },
     {
-      "id": "relay4",
+      "id": "relaym",
       "func": "sleep_mode",
       "type": "relay",
       "list": ["relay3"],
       "outputs": [
-        [0, "relay3", 0]
+      ]
+    },
+    {
+      "id": "relays",
+      "func": "sleep_mode",
+      "type": "relay",
+      "list": ["relay3"],
+      "outputs": [
       ]
     },
     {

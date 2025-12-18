@@ -79,7 +79,7 @@ void get_start(struct my_node *node, void *arg)
     if(NODE_START == node->type)
     {
         struct CK_HEAD_t *ck_queue = arg;
-        struct pro_buf *buf = calloc(sizeof(struct pro_buf), 1);
+        struct pro_buf *buf = calloc(1, sizeof(struct pro_buf));
 
         buf->pro = node;
         CK_STAILQ_INSERT_TAIL(&ck_queue->production_head, buf, queue_pro);

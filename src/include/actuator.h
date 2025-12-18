@@ -24,13 +24,13 @@ struct actuator_thread_t
 
 struct exec_buf
 {
-    CK_STAILQ_ENTRY(exec_buf) queue_exec;
+    CK_STAILQ_ENTRY(exec_buf) queue;
     _Atomic(struct my_node *) exec;// 原子操作
 };
 
 struct pro_buf
 {
-    CK_STAILQ_ENTRY(pro_buf) queue_pro;
+    CK_STAILQ_ENTRY(pro_buf) queue;
     _Atomic(struct my_node *) pro;// 原子操作
 };
 

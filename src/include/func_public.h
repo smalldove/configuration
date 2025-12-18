@@ -8,6 +8,7 @@
 #include <stdatomic.h>
 #include "list.h"
 #include "ck_queue.h"
+#include <unistd.h>
 
 enum Node_type
 {

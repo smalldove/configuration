@@ -26,24 +26,16 @@
       "id": "relay2",
       "func": "mode_3",
       "type": "branch",
-      "list": ["relaym", "relay4"],
+      "list": ["relay3", "relay4"],
       "outputs": [
         [0, "relay3", 0]
-      ]
-    },
-    {
-      "id": "relaym",
-      "func": "sleep_mode",
-      "type": "relay",
-      "list": ["relay3"],
-      "outputs": [
       ]
     },
     {
       "id": "relay4",
       "func": "sleep_mode",
       "type": "relay",
-      "list": ["relay3"],
+      "list": ["relay7"],
       "outputs": [
       ]
     },
@@ -57,31 +49,7 @@
       ]
     },
     {
-      "id": "start_2",
-      "type": "start",
-      "func": "sleep_mode",
-      "list": ["branch_1"],
-      "outputs": [
-      ]
-    },
-    {
-      "id": "branch_1",
-      "type": "branch",
-      "func": "branch_mode",
-      "list": [ "start_2_relay_6", "end_2"],
-      "outputs": [
-      ]
-    },
-    {
-      "id": "start_2_relay_6",
-      "type": "relay",
-      "func": "mode_1",
-      "list": ["end_2"],
-      "outputs": [
-      ]
-    },
-    {
-      "id": "end_2",
+      "id": "relay7",
       "type": "end",
       "func": "sleep_mode",
       "list": [],
