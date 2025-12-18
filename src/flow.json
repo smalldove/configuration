@@ -3,7 +3,6 @@
     {
       "id": "start1",
       "func": "mode_1",
-      "arg":["{json配置}"],
       "type": "start",
       "list": ["relay1"],
       "outputs": [
@@ -15,7 +14,7 @@
       "func": "mode_2",
       "type": "relay",
       "list": ["relay2"],
-      "outputs": 
+      "outputs":   
       [
         [0, "relay2", 0],
         [0, "relay3", 1],
@@ -27,9 +26,17 @@
       "id": "relay2",
       "func": "mode_3",
       "type": "branch",
-      "list": ["relay3", "relay4"],
+      "list": ["relaym", "relay4"],
       "outputs": [
         [0, "relay3", 0]
+      ]
+    },
+    {
+      "id": "relaym",
+      "func": "sleep_mode",
+      "type": "relay",
+      "list": ["relay3"],
+      "outputs": [
       ]
     },
     {
@@ -38,7 +45,6 @@
       "type": "relay",
       "list": ["relay3"],
       "outputs": [
-        [0, "relay3", 0]
       ]
     },
     {

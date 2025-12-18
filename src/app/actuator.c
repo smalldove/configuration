@@ -1,13 +1,12 @@
 #include "ck_queue.h"
 #include "list.h"
+#include <cjson/cJSON.h>
 #define _POSIX_C_SOURCE 200809L
 #include "actuator.h"
 #include "func_public.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <signal.h>
-#include <string.h>
 #include "list_cfg_loading.h"
 // 初始化执行器模块
 struct actuator_thread_t *actuator_ini(int production_num, void *(*production_unit)(void *), int execution_num, void *(*execution_unit)(void *), void *arg)
@@ -80,7 +79,10 @@ void get_start(struct my_node *node, void *arg)
     if(NODE_START == node->type)
     {
         struct CK_HEAD_t *ck_queue = arg;
-        CK_STAILQ_INSERT_TAIL(&ck_queue->production_head, node, queue);
+        struct pro_buf *buf = calloc(sizeof(struct pro_buf), 1);
+
+        buf->pro = node;
+        CK_STAILQ_INSERT_TAIL(&ck_queue->production_head, buf, queue_pro);
     }
     return;
 }
@@ -95,8 +97,8 @@ void *actuator_production(void *arg)
     }
 
     
-    struct my_node *queues = NULL;
     struct exec_buf *tmp = NULL;
+    struct pro_buf *queues = NULL;
     struct actuator_pro_arg_t *act_arg = arg;
     struct CK_HEAD_t *ck_queue = act_arg->ck_queue;
 
@@ -115,12 +117,19 @@ void *actuator_production(void *arg)
             if(!CK_STAILQ_EMPTY(&ck_queue->execution_head))
             {
                 tmp = CK_STAILQ_FIRST(&ck_queue->execution_head);
-                CK_STAILQ_REMOVE(&ck_queue->execution_head, tmp, exec_buf, queue);
                 // 获取队首元素
                 queues = CK_STAILQ_FIRST(&ck_queue->production_head);
-                // 从队列中移除队首元素
-                CK_STAILQ_REMOVE(&ck_queue->production_head, queues, my_node, queue);
-                atomic_exchange(&tmp->exec, queues);    // 原子写入
+                if (queues != NULL) {
+                    // 从队列中移除队首元素
+
+                    CK_STAILQ_REMOVE(&ck_queue->execution_head, tmp, exec_buf, queue_exec);
+                    CK_STAILQ_REMOVE(&ck_queue->production_head, queues, pro_buf, queue_pro);
+                    atomic_store(&tmp->exec, atomic_load(&queues->pro));
+
+                    // 原子写入：将生产队列中的节点转移到执行缓冲区
+                    free(queues);
+                }
+
             }
             else 
             {
@@ -150,7 +159,7 @@ void *actuator_execution(void *arg)
     struct out_list_t *out_item;
     struct out_my_node_list *out_item_data;
 
-    CK_STAILQ_INSERT_TAIL(&ck_queue->execution_head, tmp, queue);
+    CK_STAILQ_INSERT_TAIL(&ck_queue->execution_head, tmp, queue_exec);
 
     while (1) {
 
@@ -194,11 +203,16 @@ void *actuator_execution(void *arg)
             {
                 if(self_node->next[i] == NULL)
                     break;
-                CK_STAILQ_INSERT_TAIL(&ck_queue->production_head, self_node->next[i], queue);
+                struct pro_buf *pro_back = calloc(sizeof(struct pro_buf),1);
+                if (pro_back != NULL) {
+                    // 将下一个节点放入生产缓冲区
+                    atomic_store(&pro_back->pro, self_node->next[i]);
+                    CK_STAILQ_INSERT_TAIL(&ck_queue->production_head, pro_back, queue_pro);
+                }
             }
 
             atomic_store(&tmp->exec, NULL); // 清空执行指针
-            CK_STAILQ_INSERT_TAIL(&ck_queue->execution_head, tmp, queue);
+            CK_STAILQ_INSERT_TAIL(&ck_queue->execution_head, tmp, queue_exec);
 
         }
     }

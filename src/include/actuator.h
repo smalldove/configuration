@@ -24,14 +24,20 @@ struct actuator_thread_t
 
 struct exec_buf
 {
-    CK_STAILQ_ENTRY(exec_buf) queue;
+    CK_STAILQ_ENTRY(exec_buf) queue_exec;
     _Atomic(struct my_node *) exec;// 原子操作
+};
+
+struct pro_buf
+{
+    CK_STAILQ_ENTRY(pro_buf) queue_pro;
+    _Atomic(struct my_node *) pro;// 原子操作
 };
 
 struct CK_HEAD_t
 {
     CK_STAILQ_HEAD(exec_list, exec_buf) execution_head;
-    CK_STAILQ_HEAD(pro_list, my_node) production_head;
+    CK_STAILQ_HEAD(pro_list, pro_buf) production_head;
 };
 
 // 生产者的缓冲区

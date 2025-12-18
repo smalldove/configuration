@@ -14,7 +14,7 @@
       "func": "mode_2",
       "type": "relay",
       "list": ["relay2"],
-      "outputs": 
+      "outputs":   
       [
         [0, "relay2", 0],
         [0, "relay3", 1],
@@ -53,7 +53,7 @@
       "id": "start_2",
       "type": "start",
       "func": "sleep_mode",
-      "list": ["end_2"],
+      "list": ["branch_1"],
       "outputs": [
       ]
     },
@@ -61,7 +61,7 @@
       "id": "branch_1",
       "type": "branch",
       "func": "branch_mode",
-      "list": ["end_2", "start_2_relay_6"],
+      "list": [ "start_2_relay_6", "end_2"],
       "outputs": [
       ]
     },
