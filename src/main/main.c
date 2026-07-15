@@ -4,23 +4,22 @@
 #include "actuator.h"
 #include <unistd.h>
 
-// 用于显示函数的回调函数
-static void print_func_info(REG_MODE_FUNC_T func, void *arg)
+/* Print function attributes and release the memory allocated by func().
+ * The func() call in this callback allocates a func_attribute — we must free it. */
+static void print_and_release_func_info(REG_MODE_FUNC_T func, void *arg)
 {
+    (void)arg;
     static int count = 0;
     struct func_attribute *self = func();
-    printf("函数 %d: 输入数=%d, 输出数=%d\n", 
-           ++count, 
+    if (self == NULL) return;
+
+    printf("Function %d: inputs=%d, outputs=%d\n",
+           ++count,
            self->input_num,
            self->output_num);
-    
-    // 释放分配的内存
-    if (self != NULL) {
-        if (self->arg != NULL) {
-            free(self->arg);
-        }
-        free(self);
-    }
+
+    free(self->arg);
+    free(self);
 }
           
 // 用于显示配置节点的回调函数
@@ -37,7 +36,7 @@ static void print_cfg_node_info(struct my_node *node, void *arg)
 void demo_balanced_tree_registry(void)
 {
     printf("所有注册的函数:\n");
-    iterate_all_functions(print_func_info, NULL);
+    iterate_all_functions(print_and_release_func_info, NULL);
     printf("总共注册了 %d 个函数\n", get_registered_func_count());
     // 查找存在的函数
     // REG_MODE_FUNC_T found_func = find_function_by_id("mode_1");
@@ -104,8 +103,7 @@ int main(void)
     // 功能函数的注册信息打印
     demo_balanced_tree_registry();
 
-    // 
-    parse_flow_yaml_example();
+    parse_flow_config_example();
     demo_cfg_node_registry();
 
     struct actuator_thread_t *actuator = actuator_ini(1, actuator_production, 3, actuator_execution, NULL);

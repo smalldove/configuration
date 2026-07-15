@@ -7,7 +7,7 @@
 
 struct time_t_ctrl
 {
-    time_t new;
+    time_t now;
     int state;
     int sleep_next;
     int sleep_total;

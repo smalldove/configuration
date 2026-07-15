@@ -36,7 +36,7 @@ static int func_1_in(struct my_node *self, void *arg, int arg_n)
 
 static int func_1(struct my_node *self)
 {
-    if(NULL == self && NULL == self->self->arg)
+    if(NULL == self || NULL == self->self->arg)
     {
         return -1;
     }

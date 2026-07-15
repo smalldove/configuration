@@ -8,7 +8,6 @@
 #include <stdatomic.h>
 #include "list.h"
 #include "ck_queue.h"
-#include <unistd.h>
 
 enum Node_type
 {
@@ -56,6 +55,12 @@ struct func_attribute
 
 };
 
+/*
+ * NODE_ID  — max length of a node's id_name string (including NUL terminator).
+ *            Value 64 chosen to accommodate human-readable identifiers.
+ * LIST_MAX — maximum number of next-node links and output connections per node.
+ *            Value 64 balances memory footprint with practical fan-out needs.
+ */
 #define NODE_ID 64
 #define LIST_MAX 64
 

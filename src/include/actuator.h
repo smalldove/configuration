@@ -1,23 +1,30 @@
 #ifndef ACTUATOR_H
 #define ACTUATOR_H
 
-#include "func_public.h"  
+#include "func_public.h"
 #include <pthread.h>
 #include <stdbool.h>
-#include <signal.h>
 
+/* Maximum number of concurrent production/execution threads per actuator.
+ * Value chosen to balance concurrency with resource usage on typical systems. */
+#define MAX_THREAD_COUNT 32
 
 struct actuator_thread_t
 {
-    pthread_t production_id[32];
+    pthread_t production_id[MAX_THREAD_COUNT];
     int production_num;
 
-    pthread_t execution_id[32];
+    pthread_t execution_id[MAX_THREAD_COUNT];
     int execution_num;
 
     void *(*production_unit)(void *);
     void *(*execution_unit)(void *);
     void *arg;
+
+    /* Resource tracking for cleanup */
+    struct CK_HEAD_t *ck_queue;
+    void *production_arg[MAX_THREAD_COUNT];
+    void *execution_arg[MAX_THREAD_COUNT];
 };
 
 
@@ -25,13 +32,13 @@ struct actuator_thread_t
 struct exec_buf
 {
     CK_STAILQ_ENTRY(exec_buf) queue;
-    _Atomic(struct my_node *) exec;// 原子操作
+    _Atomic(struct my_node *) exec; /* atomic access only */
 };
 
 struct pro_buf
 {
     CK_STAILQ_ENTRY(pro_buf) queue;
-    _Atomic(struct my_node *) pro;// 原子操作
+    _Atomic(struct my_node *) pro; /* atomic access only */
 };
 
 struct CK_HEAD_t
@@ -40,7 +47,7 @@ struct CK_HEAD_t
     CK_STAILQ_HEAD(pro_list, pro_buf) production_head;
 };
 
-// 生产者的缓冲区
+/* Producer thread argument */
 struct actuator_pro_arg_t
 {
     int cnt;
@@ -49,7 +56,7 @@ struct actuator_pro_arg_t
 };
 
 
-// 执行者可调用队列
+/* Executor thread argument */
 struct actuator_exec_arg_t
 {
     int cnt;
@@ -63,11 +70,12 @@ struct actuator_exec_arg_t
     此方案可以将多个起始点并行执行，且执行单元与执行链路相互解耦，提高执行效率
     且该队列也可方便多生产者的实现 但目前先不考虑多生产者场景 即性能瓶颈受限生产者单元处理能力
     */
-    
+
 };
 
 struct actuator_thread_t *actuator_ini(int production_num, void *(*production_unit)(void *), int execution_num, void *(*execution_unit)(void *), void *arg);
 int actuator_create(struct actuator_thread_t *act);
+int actuator_destroy(struct actuator_thread_t *act);
 void *actuator_production(void *arg);
 void *actuator_execution(void *arg);
 
