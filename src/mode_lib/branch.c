@@ -19,6 +19,9 @@ arg: int
 
 static int func_branch_in(struct my_node *self, void *arg, int arg_n)
 {
+    (void)self;
+    (void)arg;
+    (void)arg_n;
     return 0;
 }
 
@@ -37,6 +40,8 @@ static int func_branch(struct my_node *self)
 
 static void *func_branch_out(struct my_node *self, int arg_n)
 {
+    (void)self;
+    (void)arg_n;
     return NULL;
 }
 

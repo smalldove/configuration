@@ -43,8 +43,8 @@ static int func_2(struct my_node *self)
         return 0;
     }
     
-    // 重置路径
-    self->next[0] = self->next_table[((int*)self->self->arg)[0] > ((int*)self->self->arg)[0] ? 0 : 1];
+    // 重置路径（比较两个输入参数，与 mode_3 约定一致）
+    self->next[0] = self->next_table[((int*)self->self->arg)[0] > ((int*)self->self->arg)[1] ? 0 : 1];
 
     return 0;
 }

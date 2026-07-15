@@ -223,10 +223,6 @@ void *actuator_execution(void *arg)
     struct my_node *self_node = NULL;
     struct exec_buf *tmp = calloc(sizeof(struct exec_buf), 1);
     struct CK_HEAD_t *ck_queue = act_arg->ck_queue;
-    
-    struct list_head *pos, *n, *pos_s, *n_s;
-    struct out_list_t *out_item;
-    struct out_my_node_list *out_item_data;
 
     CK_STAILQ_INSERT_TAIL(&ck_queue->execution_head, tmp, queue_exec);
 

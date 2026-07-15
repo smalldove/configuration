@@ -156,7 +156,6 @@ struct _temp_out_info_list {
     int   num;
 };
 
-static const char *get_file_extension(const char *filename);
 static int parse_json_file(const char *filename, void *user_data);
 
 /* Parse a flow-configuration file. Currently JSON-only; YAML is a stub. */
@@ -222,12 +221,32 @@ static int example_block_callback(const char *func,
 
 /* ---------- convenience entry point (demo) ---------- */
 
+static const char *resolve_flow_json_path(void)
+{
+    static const char *candidates[] = {
+        "../src/flow.json",              /* when run from project/ */
+        "src/flow.json",                 /* when run from repo root */
+        "./flow.json",
+        NULL
+    };
+
+    for (int i = 0; candidates[i] != NULL; i++) {
+        FILE *fp = fopen(candidates[i], "r");
+        if (fp != NULL) {
+            fclose(fp);
+            return candidates[i];
+        }
+    }
+    return candidates[0];
+}
+
 void parse_flow_config_example(void)
 {
     printf("=== Start parsing flow configuration ===\n");
-    const char *filename = "/home/xcvbnm/configuration/src/flow.json";
+    const char *filename = resolve_flow_json_path();
     void *user_data = NULL;
 
+    printf("Using flow config: %s\n", filename);
     int result = parse_flow_config(filename, user_data);
     if (result == 0) {
         printf("=== Parse completed ===\n");
@@ -270,14 +289,15 @@ static int parse_json_file(const char *filename, void *user_data)
         return -1;
     }
 
-    char *json_content = malloc(file_size + 1);
+    size_t size = (size_t)file_size;
+    char *json_content = malloc(size + 1);
     if (json_content == NULL) {
         fclose(file);
         fprintf(stderr, "Error: Memory allocation failed for JSON file\n");
         return -1;
     }
 
-    size_t bytes_read = fread(json_content, 1, file_size, file);
+    size_t bytes_read = fread(json_content, 1, size, file);
     json_content[bytes_read] = '\0';
     fclose(file);
 
@@ -454,13 +474,4 @@ static int parse_json_file(const char *filename, void *user_data)
     return 0;
 }
 
-/* =============================================================================
- * YAML stub
- * ============================================================================= */
-
-static int parse_yaml_file(const char *filename, void *user_data)
-{
-    (void)user_data;
-    fprintf(stderr, "YAML parsing not yet implemented for file: %s\n", filename);
-    return -1;
-}
+/* YAML parsing is not implemented yet; parse_flow_config is JSON-only. */

@@ -1,0 +1,64 @@
+{
+  "blocks": [
+    {
+      "id": "modA",
+      "func": "sleep_mode",
+      "type": "start",
+      "list": ["modB"],
+      "outputs": [
+        [0, "modB", 0]
+      ]
+    },
+    {
+      "id": "modB",
+      "func": "sleep_mode",
+      "type": "relay",
+      "list": ["modC"],
+      "outputs": [
+      ]
+    },
+    {
+      "id": "modC",
+      "func": "sleep_mode",
+      "type": "relay",
+      "list": ["modD"],
+      "outputs": [
+        [0, "modE", 0]
+      ]
+    },
+    {
+      "id": "modD",
+      "func": "sleep_mode",
+      "type": "relay",
+      "list": ["modE", "modN"],
+      "outputs": [
+      ]
+    },
+    {
+      "id": "modE",
+      "func": "sleep_mode",
+      "type": "relay",
+      "list": ["modC"],
+      "outputs": [
+      ]
+    },
+    {
+      "id": "modM",
+      "func": "sleep_mode",
+      "type": "relay",
+      "list": ["modN"],
+      "outputs": [
+        [0, "modN", 0]
+      ]
+    },
+    {
+      "id": "modN",
+      "func": "sleep_mode",
+      "type": "relay",
+      "list": ["modN"],
+      "outputs": [
+        [0, "modE", 0]
+      ]
+    }
+  ]
+}

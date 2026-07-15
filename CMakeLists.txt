@@ -196,6 +196,21 @@ endif()
 # External Dependencies
 # =============================================================================
 
+# Prefer user-local third_party prefix (no sudo / system -dev packages required)
+set(LOCAL_DEPS_PREFIX "${CMAKE_SOURCE_DIR}/third_party/prefix")
+set(LOCAL_DEPS_INCLUDE "${LOCAL_DEPS_PREFIX}/usr/include")
+set(LOCAL_DEPS_LIB "${LOCAL_DEPS_PREFIX}/usr/lib/x86_64-linux-gnu")
+if(EXISTS "${LOCAL_DEPS_INCLUDE}")
+    # SYSTEM: suppress warnings from third-party headers (ck, yaml, cjson)
+    target_include_directories(VoltageMonitor SYSTEM PRIVATE "${LOCAL_DEPS_INCLUDE}")
+    message(STATUS "Using local deps include: ${LOCAL_DEPS_INCLUDE}")
+endif()
+if(EXISTS "${LOCAL_DEPS_LIB}")
+    list(APPEND CMAKE_LIBRARY_PATH "${LOCAL_DEPS_LIB}")
+    link_directories("${LOCAL_DEPS_LIB}")
+    message(STATUS "Using local deps library: ${LOCAL_DEPS_LIB}")
+endif()
+
 # pthread library (required for threading)
 find_package(Threads REQUIRED)
 if(Threads_FOUND)
@@ -216,32 +231,50 @@ else()
 endif()
 
 # YAML library (required for YAML parsing)
-find_library(YAML_LIBRARY yaml)
+find_library(YAML_LIBRARY
+    NAMES yaml
+    PATHS "${LOCAL_DEPS_LIB}" /usr/lib /usr/lib/x86_64-linux-gnu /usr/local/lib
+    NO_DEFAULT_PATH
+)
+if(NOT YAML_LIBRARY)
+    find_library(YAML_LIBRARY yaml)
+endif()
 if(YAML_LIBRARY)
     target_link_libraries(VoltageMonitor PRIVATE ${YAML_LIBRARY})
     target_compile_definitions(VoltageMonitor PRIVATE HAVE_YAML=1)
-    message(STATUS "Found YAML library: YES")
+    message(STATUS "Found YAML library: YES (${YAML_LIBRARY})")
 else()
-    message(FATAL_ERROR "YAML library not found - required for YAML parsing")
+    message(FATAL_ERROR "YAML library not found - install libyaml-dev or extract to third_party/prefix")
 endif()
 
 # cJSON library (required for JSON parsing)
-find_library(CJSON_LIBRARY cjson)
+find_library(CJSON_LIBRARY
+    NAMES cjson
+    PATHS "${LOCAL_DEPS_LIB}" /usr/lib /usr/lib/x86_64-linux-gnu /usr/local/lib
+    NO_DEFAULT_PATH
+)
+if(NOT CJSON_LIBRARY)
+    find_library(CJSON_LIBRARY cjson)
+endif()
 if(CJSON_LIBRARY)
     target_link_libraries(VoltageMonitor PRIVATE ${CJSON_LIBRARY})
     target_compile_definitions(VoltageMonitor PRIVATE HAVE_CJSON=1)
-    message(STATUS "Found cJSON library: YES")
+    message(STATUS "Found cJSON library: YES (${CJSON_LIBRARY})")
 else()
-    message(FATAL_ERROR "cJSON library not found - required for JSON parsing")
+    message(FATAL_ERROR "cJSON library not found - install libcjson-dev or extract to third_party/prefix")
 endif()
 
-# Concurrency Kit (ck) library (required for high-performance queues)
-set(CK_LIBRARY_PATH /home/xcvbnm/ck-0.7.2/src/libck.a)
-set(CK_INCLUDE_PATH /home/xcvbnm/ck-0.7.2/include)
+# Concurrency Kit (ck) — prefer local third_party, then legacy path
+set(CK_LIBRARY_PATH "${LOCAL_DEPS_LIB}/libck.a")
+set(CK_INCLUDE_PATH "${LOCAL_DEPS_INCLUDE}")
+if(NOT EXISTS "${CK_LIBRARY_PATH}")
+    set(CK_LIBRARY_PATH /home/xcvbnm/ck-0.7.2/src/libck.a)
+    set(CK_INCLUDE_PATH /home/xcvbnm/ck-0.7.2/include)
+endif()
 
 if(EXISTS ${CK_LIBRARY_PATH} AND EXISTS ${CK_INCLUDE_PATH})
     target_link_libraries(VoltageMonitor PRIVATE ${CK_LIBRARY_PATH})
-    target_include_directories(VoltageMonitor PRIVATE ${CK_INCLUDE_PATH})
+    target_include_directories(VoltageMonitor SYSTEM PRIVATE ${CK_INCLUDE_PATH})
     target_compile_definitions(VoltageMonitor PRIVATE HAVE_CK=1)
     message(STATUS "Found Concurrency Kit (ck) library: YES")
     message(STATUS "  Library: ${CK_LIBRARY_PATH}")
@@ -249,6 +282,14 @@ if(EXISTS ${CK_LIBRARY_PATH} AND EXISTS ${CK_INCLUDE_PATH})
 else()
     message(WARNING "Concurrency Kit (ck) library not found at ${CK_LIBRARY_PATH}")
     message(WARNING "Continuing without ck library support")
+endif()
+
+# Ensure runtime can resolve shared libs from third_party (e.g. libcjson.so)
+if(EXISTS "${LOCAL_DEPS_LIB}")
+    set_target_properties(VoltageMonitor PROPERTIES
+        BUILD_RPATH "${LOCAL_DEPS_LIB}"
+        INSTALL_RPATH "${LOCAL_DEPS_LIB}"
+    )
 endif()
 
 # =============================================================================

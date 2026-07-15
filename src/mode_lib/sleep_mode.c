@@ -27,6 +27,9 @@ arg: int
 
 static int func_sleep_in(struct my_node *self, void *arg, int arg_n)
 {
+    (void)self;
+    (void)arg;
+    (void)arg_n;
     return 0;
 }
 
@@ -49,8 +52,8 @@ static int func_sleep(struct my_node *self)
     }
 
     // 计算时间差（单位：秒）
-    double elapsed = (current_time.tv_sec - last_time->tv_sec) +
-                     (current_time.tv_nsec - last_time->tv_nsec) / 1e9;
+    double elapsed = (double)(current_time.tv_sec - last_time->tv_sec) +
+                     (double)(current_time.tv_nsec - last_time->tv_nsec) / 1e9;
 
     if (elapsed >= 1.0) {
         printf("⭐️: id:%s  延时1s  执行时间戳:%ld\n", self->id_name, time(NULL));
@@ -61,8 +64,9 @@ static int func_sleep(struct my_node *self)
         self->next[1] = self->next_table[1];
 
     } else {
-        // 未到时间，延时最多1ms，降低CPU占用
-        usleep(1000);  // 1000微秒 = 1毫秒
+        // 未到时间，延时最多1ms，降低CPU占用（nanosleep 符合 _POSIX_C_SOURCE=200809L）
+        struct timespec delay = { .tv_sec = 0, .tv_nsec = 1000000L };
+        (void)nanosleep(&delay, NULL);
         self->next[0] = self;
         self->next[1] = NULL;
     }
@@ -72,6 +76,8 @@ static int func_sleep(struct my_node *self)
 
 static void *func_sleep_out(struct my_node *self, int arg_n)
 {
+    (void)self;
+    (void)arg_n;
     return NULL;
 }
 

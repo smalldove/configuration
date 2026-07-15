@@ -25,6 +25,7 @@ static void print_and_release_func_info(REG_MODE_FUNC_T func, void *arg)
 // 用于显示配置节点的回调函数
 static void print_cfg_node_info(struct my_node *node, void *arg)
 {
+    (void)arg;
     static int count = 0;
     printf("配置节点 %d: ID=%s, 类型=%d\n", 
            ++count, 

@@ -31,13 +31,13 @@ struct actuator_thread_t
 
 struct exec_buf
 {
-    CK_STAILQ_ENTRY(exec_buf) queue;
+    CK_STAILQ_ENTRY(exec_buf) queue_exec;
     _Atomic(struct my_node *) exec; /* atomic access only */
 };
 
 struct pro_buf
 {
-    CK_STAILQ_ENTRY(pro_buf) queue;
+    CK_STAILQ_ENTRY(pro_buf) queue_pro;
     _Atomic(struct my_node *) pro; /* atomic access only */
 };
 
